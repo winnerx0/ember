@@ -7,14 +7,24 @@ import { useMutation } from "@tanstack/react-query";
 import { FlowCanvas } from "@/components/canvas/flow-canvas";
 import { NodePalette } from "@/components/layout/node-palette";
 import { Toolbar } from "@/components/layout/toolbar";
+import { CustomElementModal } from "@/components/modals/custom-element-modal";
 import { useCanvasStore } from "@/stores/canvas-store";
 import { useCreateDiagram } from "@/lib/hooks/use-diagrams";
 import { Toaster } from "@/components/ui/toaster";
 import { useToast } from "@/components/ui/use-toast";
+import * as LucideIcons from "lucide-react";
+import {
+  SidebarProvider,
+  SidebarInset,
+  useSidebar,
+} from "@/components/ui/sidebar";
+import { Button } from "@/components/ui/button";
+import type { NodeCategory } from "@/lib/types";
 
 function NewCanvasEditor() {
   const router = useRouter();
   const canvasRef = useRef<HTMLDivElement>(null);
+  const [isCustomModalOpen, setIsCustomModalOpen] = useState(false);
   const { nodes, edges, diagramTitle, diagramDescription, setIsSaving } =
     useCanvasStore();
   const createDiagram = useCreateDiagram();
@@ -80,17 +90,54 @@ function NewCanvasEditor() {
     toast,
   ]);
 
+  const handleCreateCustomElement = (element: {
+    name: string;
+    category: NodeCategory;
+    description: string;
+    icon: string;
+  }) => {
+    toast({
+      title: "Custom Element Created",
+      description: `${element.name} has been added to your library.`,
+    });
+  };
+
   return (
-    <div className="relative w-full h-screen flex overflow-hidden bg-background">
-      <Toolbar canvasRef={canvasRef} />
-
-      <NodePalette />
-
-      <div className="flex-1 relative" ref={canvasRef}>
-        <FlowCanvas />
+    <SidebarProvider defaultOpen={true}>
+      <div className="relative w-full h-screen flex overflow-hidden bg-background">
+        <Toolbar canvasRef={canvasRef} />
+        <NodePalette onAddCustomElement={() => setIsCustomModalOpen(true)} />
+        <SidebarInset className="flex-1 relative">
+          <SidebarToggleButton />
+          <div className="w-full h-full" ref={canvasRef}>
+            <FlowCanvas />
+          </div>
+        </SidebarInset>
+        <CustomElementModal
+          isOpen={isCustomModalOpen}
+          onClose={() => setIsCustomModalOpen(false)}
+          onSave={handleCreateCustomElement}
+        />
+        <Toaster />
       </div>
-      <Toaster />
-    </div>
+    </SidebarProvider>
+  );
+}
+
+function SidebarToggleButton() {
+  const { open, toggleSidebar } = useSidebar();
+
+  if (open) return null;
+
+  return (
+    <Button
+      variant="outline"
+      size="icon"
+      className="absolute top-4 left-4 z-50 h-8 w-8 rounded-md shadow-md hover:shadow-lg transition-all"
+      onClick={toggleSidebar}
+    >
+      <LucideIcons.PanelLeft className="h-4 w-4" />
+    </Button>
   );
 }
 

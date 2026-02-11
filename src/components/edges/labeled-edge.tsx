@@ -8,6 +8,7 @@ import {
   BaseEdge,
 } from "reactflow";
 import { cn } from "@/lib/utils";
+import { useCanvasStore } from "@/stores/canvas-store";
 
 export const LabeledEdge = memo(function LabeledEdge({
   id,
@@ -21,6 +22,7 @@ export const LabeledEdge = memo(function LabeledEdge({
   markerEnd,
   data,
 }: EdgeProps<{ label?: string }>) {
+  const { updateEdge } = useCanvasStore();
   const [isEditing, setIsEditing] = useState(false);
   const [labelValue, setLabelValue] = useState(data?.label || "");
 
@@ -39,9 +41,11 @@ export const LabeledEdge = memo(function LabeledEdge({
   }, [data?.label]);
 
   const handleSubmit = useCallback(() => {
-    // In real app, this would update the edge in the store
+    if (labelValue.trim()) {
+      updateEdge(id, { label: labelValue.trim() });
+    }
     setIsEditing(false);
-  }, []);
+  }, [id, labelValue, updateEdge]);
 
   const handleKeyDown = useCallback(
     (e: React.KeyboardEvent) => {
@@ -61,8 +65,9 @@ export const LabeledEdge = memo(function LabeledEdge({
         markerEnd={markerEnd}
         style={{
           ...style,
-          strokeWidth: 2,
-          stroke: "hsl(var(--muted-foreground))",
+          strokeWidth: 2.5,
+          stroke: "hsl(var(--foreground))",
+          opacity: 0.7,
         }}
       />
       <EdgeLabelRenderer>

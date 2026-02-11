@@ -15,6 +15,7 @@ import ReactFlow, {
   applyNodeChanges,
   applyEdgeChanges,
   ConnectionMode,
+  BackgroundVariant,
 } from "reactflow";
 import "reactflow/dist/style.css";
 
@@ -186,22 +187,29 @@ export function FlowCanvas() {
         }}
       >
         {/* Grid background */}
-        <Background gap={20} size={1} className="bg-muted" />
+        <Background
+          gap={16}
+          size={1}
+          color="hsl(var(--border))"
+          variant={BackgroundVariant.Dots}
+        />
 
         {/* MiniMap */}
         <MiniMap
-          className="bg-background border border-border"
-          nodeClassName="fill-primary/20"
+          position="bottom-right"
+          pannable
+          zoomable
+          nodeBorderRadius={6}
         />
 
         {/* Controls */}
         <Controls
-          className="bg-background border border-border rounded-lg"
           showInteractive={false}
+          position="top-right"
         />
 
         {/* Legend */}
-        <Legend />
+        {/* <Legend /> */}
       </ReactFlow>
     </div>
   );

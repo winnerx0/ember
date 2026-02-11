@@ -50,6 +50,7 @@ interface CanvasActions {
 
   // Edge actions
   addEdge: (edge: Edge) => void;
+  updateEdge: (id: string, data: any) => void;
   deleteEdge: (id: string) => void;
   setEdges: (edges: Edge[]) => void;
 
@@ -168,6 +169,16 @@ export const useCanvasStore = create<CanvasStore>((set, get) => ({
 
     set((state) => ({
       edges: [...state.edges, newEdge],
+    }));
+
+    get().addToHistory();
+  },
+
+  updateEdge: (id, data) => {
+    set((state) => ({
+      edges: state.edges.map((edge) =>
+        edge.id === id ? { ...edge, data: { ...edge.data, ...data } } : edge,
+      ),
     }));
 
     get().addToHistory();

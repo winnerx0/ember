@@ -19,7 +19,7 @@ export function Legend() {
         {/* Header */}
         <button
           onClick={() => setIsCollapsed(!isCollapsed)}
-          className="w-full px-3 py-2 flex items-center justify-between hover:bg-muted/50 transition-colors"
+          className="w-full px-3 py-2 flex items-center justify-between"
         >
           <span className="text-xs font-semibold text-foreground uppercase tracking-wider">
             Legend

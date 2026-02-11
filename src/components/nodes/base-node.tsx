@@ -78,12 +78,9 @@ export const BaseNode = memo(function BaseNode({
   return (
     <div
       className={cn(
-        "min-w-[200px] max-w-[300px] rounded-lg border-2 p-3 shadow-lg transition-all duration-200",
+        "min-w-[200px] max-w-[300px] rounded-lg border p-3 transition-all duration-200",
         "bg-card/95 backdrop-blur-sm",
-        selected
-          ? "ring-2 ring-primary ring-offset-2 ring-offset-background"
-          : "",
-        config.borderColor,
+        selected ? "scale-[1.02] border-primary" : "border-border/50",
         config.bgColor,
       )}
       onDoubleClick={handleDoubleClick}
@@ -91,21 +88,21 @@ export const BaseNode = memo(function BaseNode({
       {selected && (
         <button
           onClick={handleDelete}
-          className="absolute -top-2 -right-2 p-1 rounded-full bg-destructive text-destructive-foreground shadow-sm hover:bg-destructive/90 transition-colors z-10"
+          className="absolute -top-2 -right-2 p-1.5 rounded-full bg-destructive text-destructive-foreground hover:bg-destructive/90 transition-all hover:scale-110 z-10"
         >
-          <LucideIcons.X className="w-3 h-3" />
+          <LucideIcons.X className="w-3.5 h-3.5" />
         </button>
       )}
 
       <div className="flex items-start gap-3">
         <div
           className={cn(
-            "flex-shrink-0 w-8 h-8 rounded-lg flex items-center justify-center border",
+            "flex-shrink-0 w-10 h-10 rounded-lg flex items-center justify-center border shadow-sm",
             config.bgColor,
             config.borderColor,
           )}
         >
-          {Icon && <Icon className={cn("w-4 h-4", config.color)} />}
+          {Icon && <Icon className={cn("w-5 h-5", config.color)} />}
         </div>
 
         <div className="flex-1 min-w-0">
@@ -149,16 +146,16 @@ export const BaseNode = memo(function BaseNode({
         type="target"
         position={Position.Top}
         className={cn(
-          "w-3 h-3 !bg-muted-foreground/50 !border-2 !border-background",
-          "hover:!bg-primary transition-colors",
+          "w-3 h-3 !bg-muted-foreground/50 !border-2 !border-background shadow-sm",
+          "hover:!bg-primary hover:scale-125 transition-all",
         )}
       />
       <Handle
         type="source"
         position={Position.Bottom}
         className={cn(
-          "w-3 h-3 !bg-muted-foreground/50 !border-2 !border-background",
-          "hover:!bg-primary transition-colors",
+          "w-3 h-3 !bg-muted-foreground/50 !border-2 !border-background shadow-sm",
+          "hover:!bg-primary hover:scale-125 transition-all",
         )}
       />
       <Handle
@@ -166,8 +163,8 @@ export const BaseNode = memo(function BaseNode({
         position={Position.Left}
         id="left"
         className={cn(
-          "w-3 h-3 !bg-muted-foreground/50 !border-2 !border-background",
-          "hover:!bg-primary transition-colors",
+          "w-3 h-3 !bg-muted-foreground/50 !border-2 !border-background shadow-sm",
+          "hover:!bg-primary hover:scale-125 transition-all",
         )}
       />
       <Handle
@@ -175,8 +172,8 @@ export const BaseNode = memo(function BaseNode({
         position={Position.Right}
         id="right"
         className={cn(
-          "w-3 h-3 !bg-muted-foreground/50 !border-2 !border-background",
-          "hover:!bg-primary transition-colors",
+          "w-3 h-3 !bg-muted-foreground/50 !border-2 !border-background shadow-sm",
+          "hover:!bg-primary hover:scale-125 transition-all",
         )}
       />
     </div>

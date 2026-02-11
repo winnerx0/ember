@@ -3,6 +3,19 @@
 import { DragEvent, useState } from "react";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { Separator } from "@/components/ui/separator";
+import { Button } from "@/components/ui/button";
+import {
+  Sidebar,
+  SidebarContent,
+  SidebarHeader,
+  SidebarFooter,
+  SidebarGroup,
+  SidebarGroupContent,
+  SidebarGroupLabel,
+  SidebarMenu,
+  SidebarMenuItem,
+  useSidebar,
+} from "@/components/ui/sidebar";
 import * as LucideIcons from "lucide-react";
 import { cn } from "@/lib/utils";
 import {
@@ -11,6 +24,8 @@ import {
 } from "@/lib/constants/implementations";
 import type { NodeCategory } from "@/lib/types";
 import { ModeToggle } from "@/components/mode-toggle";
+
+const SIDEBAR_WIDTH = "20rem";
 
 interface DraggableNodeProps {
   category: NodeCategory;
@@ -81,6 +96,7 @@ interface NodePaletteProps {
 
 export function NodePalette({ onAddCustomElement }: NodePaletteProps) {
   const [searchQuery, setSearchQuery] = useState("");
+  const { toggleSidebar } = useSidebar();
 
   const categories = Object.entries(CATEGORY_CONFIGS)
     .filter(([key]) => key !== "custom")
@@ -91,89 +107,98 @@ export function NodePalette({ onAddCustomElement }: NodePaletteProps) {
     );
 
   return (
-    <div className="w-80 h-full border-r border-border bg-background flex flex-col">
-      {/* Header */}
-      <div className="p-4 border-b border-border space-y-4">
-        <div className="flex items-center justify-between">
-          <div>
-            <h2 className="text-lg font-bold text-foreground">Components</h2>
-            <p className="text-xs text-muted-foreground mt-1">
-              Drag to canvas to add
-            </p>
+    <Sidebar collapsible="offcanvas" className="border-r" style={{ "--sidebar-width": SIDEBAR_WIDTH } as React.CSSProperties}>
+      <SidebarHeader className="border-b p-0">
+        <div className="flex items-center justify-between px-4 py-3">
+          <h2 className="text-lg font-semibold">Components</h2>
+          <div className="flex items-center gap-2">
+            <ModeToggle />
+            <Button
+              variant="ghost"
+              size="icon"
+              onClick={toggleSidebar}
+              className="h-8 w-8"
+            >
+              <LucideIcons.PanelLeftClose className="h-4 w-4" />
+            </Button>
           </div>
-          <ModeToggle />
         </div>
-
-        {/* Search */}
-        <div className="relative">
-          <LucideIcons.Search className="absolute left-2.5 top-2.5 w-4 h-4 text-muted-foreground" />
-          <input
-            type="text"
-            placeholder="Search components..."
-            value={searchQuery}
-            onChange={(e) => setSearchQuery(e.target.value)}
-            className="w-full pl-9 pr-3 py-2 bg-muted border border-border rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-primary"
-          />
-        </div>
-
-        {/* Custom Element Button */}
-        <button
-          onClick={onAddCustomElement}
-          className="w-full py-2 px-3 bg-primary/10 hover:bg-primary/20 text-primary rounded-lg text-sm font-medium transition-colors flex items-center justify-center gap-2"
-        >
-          <LucideIcons.Plus className="w-4 h-4" />
-          Create Custom Element
-        </button>
-      </div>
-
-      {/* Node List */}
-      <ScrollArea className="flex-1">
-        <div className="p-4 space-y-4">
-          {categories.map(([category, config]) => (
-            <DraggableNode
-              key={category}
-              category={category as NodeCategory}
-              label={config.label}
-              icon={config.icon}
-              color={config.color}
-              bgColor={config.bgColor}
-              borderColor={config.borderColor}
-              description={config.description}
+        <div className="px-4 pb-3">
+          <div className="relative">
+            <LucideIcons.Search className="absolute left-2.5 top-2.5 h-4 w-4 text-muted-foreground" />
+            <input
+              type="text"
+              placeholder="Search components..."
+              value={searchQuery}
+              onChange={(e) => setSearchQuery(e.target.value)}
+              className="w-full pl-9 pr-3 py-2 bg-muted/50 border border-border rounded-md text-sm focus:outline-none focus:ring-2 focus:ring-ring"
             />
-          ))}
-
-          {categories.length === 0 && (
-            <div className="text-center py-8 text-muted-foreground text-sm">
-              No components found matching "{searchQuery}"
-            </div>
-          )}
+          </div>
         </div>
+      </SidebarHeader>
+
+      <SidebarContent>
+        <SidebarGroup>
+          <SidebarGroupLabel>Drag to Canvas</SidebarGroupLabel>
+          <SidebarGroupContent>
+            <div className="px-2 space-y-2">
+              {categories.map(([category, config]) => (
+                <DraggableNode
+                  key={category}
+                  category={category as NodeCategory}
+                  label={config.label}
+                  icon={config.icon}
+                  color={config.color}
+                  bgColor={config.bgColor}
+                  borderColor={config.borderColor}
+                  description={config.description}
+                />
+              ))}
+
+              {categories.length === 0 && (
+                <div className="text-center py-8 text-muted-foreground text-sm">
+                  No components found
+                </div>
+              )}
+            </div>
+          </SidebarGroupContent>
+        </SidebarGroup>
 
         <Separator className="my-4" />
 
-        {/* Implementation Info */}
-        <div className="p-4 pb-8">
-          <h3 className="text-sm font-semibold text-foreground mb-2">
-            Available Implementations
-          </h3>
-          <div className="space-y-3 text-xs text-muted-foreground">
-            {Object.entries(IMPLEMENTATIONS)
-              .slice(0, 5)
-              .map(([category, impls]) => (
-                <div key={category}>
-                  <div className="font-medium text-foreground mb-1">
-                    {CATEGORY_CONFIGS[category as NodeCategory]?.label}
+        <SidebarGroup>
+          <SidebarGroupLabel>Implementations</SidebarGroupLabel>
+          <SidebarGroupContent>
+            <div className="px-4 space-y-3 text-xs text-muted-foreground">
+              {Object.entries(IMPLEMENTATIONS)
+                .slice(0, 5)
+                .map(([category, impls]) => (
+                  <div key={category}>
+                    <div className="font-medium text-foreground mb-1">
+                      {CATEGORY_CONFIGS[category as NodeCategory]?.label}
+                    </div>
+                    <div className="space-y-0.5 pl-2">
+                      {impls.map((impl) => (
+                        <div key={impl.id}>• {impl.name}</div>
+                      ))}
+                    </div>
                   </div>
-                  <div className="space-y-0.5 pl-2">
-                    {impls.map((impl) => (
-                      <div key={impl.id}>• {impl.name}</div>
-                    ))}
-                  </div>
-                </div>
-              ))}
-          </div>
-        </div>
-      </ScrollArea>
-    </div>
+                ))}
+            </div>
+          </SidebarGroupContent>
+        </SidebarGroup>
+      </SidebarContent>
+
+      <SidebarFooter className="border-t p-4">
+        <Button
+          onClick={onAddCustomElement}
+          className="w-full"
+          variant="outline"
+        >
+          <LucideIcons.Plus className="mr-2 h-4 w-4" />
+          Create Custom Element
+        </Button>
+      </SidebarFooter>
+    </Sidebar>
   );
 }
