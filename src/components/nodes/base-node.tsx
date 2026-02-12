@@ -11,17 +11,38 @@ import {
 import { useCanvasStore } from "@/stores/canvas-store";
 import type { NodeData, NodeCategory } from "@/lib/types";
 
+// Health Status Colors
+const healthStatusColors = {
+  healthy: "bg-green-500",
+  degraded: "bg-yellow-500",
+  down: "bg-red-500",
+};
+
 export const BaseNode = memo(function BaseNode({
   id,
   data,
   selected,
-}: NodeProps<NodeData>) {
+  fanOutCount = 0, // Add fanOutCount prop with default value
+}: NodeProps<NodeData> & { fanOutCount?: number }) {
   const [isEditing, setIsEditing] = useState(false);
   const [editValue, setEditValue] = useState(data.label);
-  const { updateNode, deleteNode } = useCanvasStore();
+  const { updateNode, deleteNode, highlightedNodes, isObservabilityMode, nodeMetrics } = useCanvasStore();
+
+  const isHighlighted = highlightedNodes.has(id);
+  const metrics = nodeMetrics.get(id);
 
   const category = data.category as NodeCategory;
   const config = CATEGORY_CONFIGS[category] || CATEGORY_CONFIGS.service;
+
+  // Determine bottleneck style
+  let bottleneckStyle = "";
+  if (isObservabilityMode && metrics) {
+    if (metrics.errorRate > 5 || metrics.latency > 500) {
+      bottleneckStyle = "ring-4 ring-red-500 ring-opacity-75"; // High severity
+    } else if (metrics.errorRate > 1 || metrics.latency > 200) {
+      bottleneckStyle = "ring-4 ring-yellow-500 ring-opacity-75"; // Medium severity
+    }
+  }
 
   // Fix: Ensure we pass a string ID to getImplementationById
   const implementationId =
@@ -81,6 +102,8 @@ export const BaseNode = memo(function BaseNode({
         "min-w-[200px] max-w-[300px] rounded-lg border p-3",
         "bg-card/95 backdrop-blur-sm",
         selected ? "scale-[1.02] border-primary" : "border-border/50",
+        isHighlighted && "ring-4 ring-red-500 ring-opacity-75", // Analysis Highlight style
+        bottleneckStyle, // Observability bottleneck style
         config.bgColor,
       )}
       onDoubleClick={handleDoubleClick}
@@ -92,6 +115,16 @@ export const BaseNode = memo(function BaseNode({
         >
           <LucideIcons.X className="w-3.5 h-3.5" />
         </button>
+      )}
+
+      {/* Health Status Indicator */}
+      {data.healthStatus && !isObservabilityMode && (
+        <div
+          className={cn(
+            "absolute -top-1.5 -left-1.5 w-3 h-3 rounded-full border-2 border-background",
+            healthStatusColors[data.healthStatus],
+          )}
+        />
       )}
 
       <div className="flex items-start gap-3">
@@ -123,23 +156,35 @@ export const BaseNode = memo(function BaseNode({
             </h3>
           )}
 
-          {/* Description */}
-          {data.description && (
-            <p className="text-xs text-muted-foreground mt-1 line-clamp-2 leading-relaxed">
-              {data.description}
-            </p>
-          )}
-
-          {/* Implementation Badge */}
-          {implementation && (
-            <div className="mt-2 flex items-center gap-1.5">
-              <span className="text-[10px] px-1.5 py-0.5 rounded bg-background/50 border border-border text-muted-foreground">
-                {implementation.name}
-              </span>
-            </div>
+          {/* Tech Stack */}
+          {data.techStack && (
+            <p className="text-xs text-muted-foreground mt-1">{data.techStack}</p>
           )}
         </div>
       </div>
+
+      {/* Badges */}
+      <div className="mt-2 flex items-center flex-wrap gap-1.5">
+        {implementation && (
+          <span className="text-[10px] px-1.5 py-0.5 rounded bg-background/50 border border-border text-muted-foreground">
+            {implementation.name}
+          </span>
+        )}
+        {typeof fanOutCount === 'number' && (
+          <span className="text-[10px] px-1.5 py-0.5 rounded bg-primary/10 border border-primary/20 text-primary-foreground">
+            Fan-out: {fanOutCount}
+          </span>
+        )}
+      </div>
+
+      {/* Observability Metrics Overlay */}
+      {isObservabilityMode && metrics && (
+        <div className="mt-2 text-xs text-muted-foreground space-y-0.5">
+          <p>Req/s: {metrics.requestRate.toFixed(1)}</p>
+          <p>Err%: {metrics.errorRate.toFixed(1)}</p>
+          <p>Latency: {metrics.latency.toFixed(1)}ms</p>
+        </div>
+      )}
 
       {/* Handles */}
       <Handle

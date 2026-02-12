@@ -13,6 +13,7 @@ import { useDiagram, useUpdateDiagram } from "@/lib/hooks/use-diagrams";
 import { Toaster } from "@/components/ui/toaster";
 import { useToast } from "@/components/ui/use-toast";
 import * as LucideIcons from "lucide-react";
+import { PropertiesPanel } from "@/components/layout/properties-panel";
 import {
   SidebarProvider,
   SidebarInset,
@@ -20,12 +21,14 @@ import {
 } from "@/components/ui/sidebar";
 import { Button } from "@/components/ui/button";
 import type { NodeCategory } from "@/lib/types";
+import { DocumentationModal } from "@/components/modals/documentation-modal";
 
 function CanvasEditor() {
   const params = useParams();
   const diagramId = params.id as string;
   const canvasRef = useRef<HTMLDivElement>(null);
   const [isCustomModalOpen, setIsCustomModalOpen] = useState(false);
+  const [isDocumentationModalOpen, setIsDocumentationModalOpen] = useState(false);
 
   const { toast } = useToast();
   const queryClient = useQueryClient();
@@ -236,7 +239,7 @@ function CanvasEditor() {
   return (
     <SidebarProvider defaultOpen={true}>
       <div className="relative w-full h-screen flex overflow-hidden bg-background">
-        <Toolbar onSave={handleSave} canvasRef={canvasRef} />
+        <Toolbar onSave={handleSave} canvasRef={canvasRef} setIsDocumentationModalOpen={setIsDocumentationModalOpen} />
 
         <NodePalette onAddCustomElement={() => setIsCustomModalOpen(true)} />
 
@@ -247,10 +250,16 @@ function CanvasEditor() {
           </div>
         </SidebarInset>
 
+        <PropertiesPanel />
+
         <CustomElementModal
           isOpen={isCustomModalOpen}
           onClose={() => setIsCustomModalOpen(false)}
           onSave={handleCreateCustomElement}
+        />
+        <DocumentationModal
+          isOpen={isDocumentationModalOpen}
+          onClose={() => setIsDocumentationModalOpen(false)}
         />
         <Toaster />
       </div>

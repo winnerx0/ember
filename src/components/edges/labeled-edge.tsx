@@ -12,6 +12,8 @@ import {
 import { cn } from "@/lib/utils";
 import { useCanvasStore } from "@/stores/canvas-store";
 
+import { EdgeData } from "@/lib/types";
+
 function useEdgePath(
   type: string | undefined,
   params: {
@@ -47,10 +49,12 @@ export const LabeledEdge = memo(function LabeledEdge({
   style = {},
   markerEnd,
   data,
-}: EdgeProps<{ label?: string }>) {
-  const { updateEdge, edgeType } = useCanvasStore();
+}: EdgeProps<EdgeData>) {
+  const { updateEdge, edgeType, highlightedEdges } = useCanvasStore();
   const [isEditing, setIsEditing] = useState(false);
   const [labelValue, setLabelValue] = useState(data?.label || "");
+
+  const isHighlighted = highlightedEdges.has(id);
 
   const [edgePath, labelX, labelY] = useEdgePath(edgeType, {
     sourceX,
@@ -91,10 +95,10 @@ export const LabeledEdge = memo(function LabeledEdge({
         markerEnd={markerEnd}
         style={{
           ...style,
-          strokeWidth: 2,
-          stroke: "hsl(var(--foreground))",
-          opacity: 0.7,
-          strokeDasharray: "none",
+          strokeWidth: isHighlighted ? 4 : 2, // Thicker stroke for highlighted edges
+          stroke: isHighlighted ? "hsl(var(--destructive))" : "hsl(var(--foreground))", // Red color for highlighted
+          opacity: isHighlighted ? 1 : 0.7,
+          strokeDasharray: data?.isAsync ? "5 5" : "none",
         }}
       />
       <EdgeLabelRenderer>
@@ -120,12 +124,22 @@ export const LabeledEdge = memo(function LabeledEdge({
           ) : (
             <div
               className={cn(
-                "px-2 py-0.5 text-[10px] font-medium rounded cursor-pointer",
+                "px-2 py-1 text-center text-[10px] font-medium rounded cursor-pointer",
                 "bg-card/90 border border-border text-foreground",
                 "hover:bg-muted transition-colors",
+                isHighlighted && "bg-destructive/90 text-destructive-foreground border-destructive", // Highlight style
               )}
             >
-              {data?.label || "Click to add label"}
+              <div className="font-bold">{data?.label || "No label"}</div>
+              {data?.communicationType && (
+                <div className="text-muted-foreground">
+                  {data.communicationType.toUpperCase()}
+                  {data.isAsync ? " (Async)" : ""}
+                </div>
+              )}
+               {data?.latency && (
+                <div className="text-muted-foreground">{data.latency}ms</div>
+              )}
             </div>
           )}
         </div>

@@ -19,23 +19,30 @@ import {
   Minus,
   CornerDownRight,
   GitBranch,
+  Target,
+  XCircle,
+  AlertTriangle,
+  Activity, // New import for observability icon
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { useCanvasStore } from "@/stores/canvas-store";
 import type { EdgeType } from "@/stores/canvas-store";
+import { detectCircularDependencies, findSinglePointsOfFailure } from "@/lib/analysis/graph";
+import { useToast } from "@/components/ui/use-toast";
 
 interface ToolbarProps {
   onSave?: () => void;
   canvasRef?: React.RefObject<HTMLDivElement>;
+  setIsDocumentationModalOpen: (isOpen: boolean) => void;
 }
 
-export function Toolbar({ onSave, canvasRef }: ToolbarProps) {
+export function Toolbar({ onSave, canvasRef, setIsDocumentationModalOpen }: ToolbarProps) {
   const [isExportMenuOpen, setIsExportMenuOpen] = useState(false);
   const [isEditingTitle, setIsEditingTitle] = useState(false);
   const [titleValue, setTitleValue] = useState("");
   const titleInputRef = useRef<HTMLInputElement>(null);
-
   const [isEdgeTypeMenuOpen, setIsEdgeTypeMenuOpen] = useState(false);
+  const { toast } = useToast();
 
   const {
     diagramTitle,
@@ -47,6 +54,15 @@ export function Toolbar({ onSave, canvasRef }: ToolbarProps) {
     canRedo,
     edgeType,
     setEdgeType,
+    nodes,
+    edges,
+    setHighlights,
+    clearHighlights,
+    highlightedNodes,
+    highlightedEdges,
+    isObservabilityMode,
+    toggleObservabilityMode,
+    setNodeMetrics,
   } = useCanvasStore();
 
   const edgeTypeOptions: {
@@ -109,6 +125,101 @@ export function Toolbar({ onSave, canvasRef }: ToolbarProps) {
     [handleTitleSubmit],
   );
 
+  // Observability Mode Toggle
+  const handleToggleObservabilityMode = useCallback(() => {
+    toggleObservabilityMode();
+    if (!isObservabilityMode) {
+      // Generate dummy metrics when turning on
+      const newMetrics = new Map();
+      nodes.forEach((node) => {
+        newMetrics.set(node.id, {
+          requestRate: Math.random() * 100, // 0-100 req/s
+          errorRate: Math.random() * 10, // 0-10% error rate
+          latency: Math.random() * 1000, // 0-1000ms latency
+        });
+      });
+      setNodeMetrics(newMetrics);
+      toast({
+        title: "Observability Mode On",
+        description: "Displaying simulated real-time metrics.",
+      });
+    } else {
+      // Clear metrics when turning off
+      setNodeMetrics(new Map());
+      toast({
+        title: "Observability Mode Off",
+        description: "Metrics overlay removed.",
+      });
+    }
+  }, [isObservabilityMode, toggleObservabilityMode, nodes, setNodeMetrics, toast]);
+
+  // Circular Dependency Analysis
+  const handleDetectCircularDependencies = useCallback(() => {
+    const cycles = detectCircularDependencies(nodes, edges);
+
+    if (cycles.length > 0) {
+      const cycleNodeIds = new Set<string>();
+      const cycleEdgeIds = new Set<string>();
+
+      cycles.forEach((cycle) => {
+        cycle.forEach((nodeId, index) => {
+          cycleNodeIds.add(nodeId);
+          if (index < cycle.length - 1) {
+            const source = cycle[index];
+            const target = cycle[index + 1];
+            const edge = edges.find(
+              (e) => e.source === source && e.target === target,
+            );
+            if (edge) {
+              cycleEdgeIds.add(edge.id);
+            }
+          }
+        });
+      });
+
+      setHighlights(Array.from(cycleNodeIds), Array.from(cycleEdgeIds));
+      toast({
+        title: "Circular Dependencies Detected!",
+        description: `Found ${cycles.length} cycles. Highlighted on canvas.`,
+        variant: "destructive",
+      });
+    } else {
+      clearHighlights();
+      toast({
+        title: "No Circular Dependencies",
+        description: "Your diagram is cycle-free.",
+      });
+    }
+  }, [nodes, edges, setHighlights, clearHighlights, toast]);
+
+  // Single Point of Failure Analysis
+  const handleDetectSinglePointsOfFailure = useCallback(() => {
+    const spofs = findSinglePointsOfFailure(nodes, edges);
+
+    if (spofs.length > 0) {
+      setHighlights(spofs, []); // Highlight only the SPOF nodes
+      toast({
+        title: "Single Points of Failure Detected!",
+        description: `Found ${spofs.length} potential SPOFs. Highlighted on canvas.`,
+        variant: "destructive",
+      });
+    } else {
+      clearHighlights();
+      toast({
+        title: "No Single Points of Failure",
+        description: "Your diagram seems resilient.",
+      });
+    }
+  }, [nodes, edges, setHighlights, clearHighlights, toast]);
+
+  const handleClearHighlights = useCallback(() => {
+    clearHighlights();
+    toast({
+      title: "Highlights Cleared",
+      description: "Analysis highlights have been removed.",
+    });
+  }, [clearHighlights, toast]);
+
   // Export functions
   const exportAsPng = useCallback(async () => {
     if (!canvasRef?.current) return;
@@ -156,6 +267,26 @@ export function Toolbar({ onSave, canvasRef }: ToolbarProps) {
     }
     setIsExportMenuOpen(false);
   }, [canvasRef, diagramTitle]);
+
+  const exportAsJson = useCallback(() => {
+    const diagramData = {
+      nodes: nodes.map(node => ({ ...node, data: { ...node.data } })),
+      edges: edges.map(edge => ({ ...edge, data: { ...edge.data } })),
+      title: diagramTitle,
+      description: useCanvasStore.getState().diagramDescription,
+    };
+    const jsonString = JSON.stringify(diagramData, null, 2);
+    const blob = new Blob([jsonString], { type: "application/json" });
+    const href = URL.createObjectURL(blob);
+    const link = document.createElement("a");
+    link.href = href;
+    link.download = `${diagramTitle.replace(/\s+/g, "-").toLowerCase()}.json`;
+    document.body.appendChild(link);
+    link.click();
+    document.body.removeChild(link);
+    URL.revokeObjectURL(href);
+    setIsExportMenuOpen(false);
+  }, [nodes, edges, diagramTitle]);
 
   return (
     <div className="absolute top-4 left-1/2 -translate-x-1/2 z-50 flex items-center gap-2">
@@ -232,6 +363,54 @@ export function Toolbar({ onSave, canvasRef }: ToolbarProps) {
         {/* Divider */}
         <div className="w-px h-6 bg-border mx-1" />
 
+        {/* Circular Dependency Analysis */}
+        <button
+          onClick={handleDetectCircularDependencies}
+          className="p-2 rounded-md hover:bg-muted text-foreground transition-colors"
+          title="Detect Circular Dependencies"
+        >
+          <Target className="w-4 h-4" />
+        </button>
+
+        {/* Single Points of Failure Analysis */}
+        <button
+          onClick={handleDetectSinglePointsOfFailure}
+          className="p-2 rounded-md hover:bg-muted text-foreground transition-colors"
+          title="Detect Single Points of Failure"
+        >
+          <AlertTriangle className="w-4 h-4" />
+        </button>
+
+        {highlightedNodes.size > 0 && (
+          <button
+            onClick={handleClearHighlights}
+            className="p-2 rounded-md hover:bg-muted text-foreground transition-colors"
+            title="Clear Highlights"
+          >
+            <XCircle className="w-4 h-4" />
+          </button>
+        )}
+
+        {/* Divider */}
+        <div className="w-px h-6 bg-border mx-1" />
+
+        {/* Observability Mode Toggle */}
+        <button
+          onClick={handleToggleObservabilityMode}
+          className={cn(
+            "p-2 rounded-md transition-colors",
+            isObservabilityMode
+              ? "bg-primary/10 text-primary hover:bg-primary/20"
+              : "hover:bg-muted text-foreground",
+          )}
+          title="Toggle Observability Mode"
+        >
+          <Activity className="w-4 h-4" />
+        </button>
+
+        {/* Divider */}
+        <div className="w-px h-6 bg-border mx-1" />
+
         {/* Edge Type Dropdown */}
         <div className="relative">
           <button
@@ -303,6 +482,15 @@ export function Toolbar({ onSave, canvasRef }: ToolbarProps) {
           <Save className="w-4 h-4" />
         </button>
 
+        {/* Generate Docs Button */}
+        <button
+          onClick={() => setIsDocumentationModalOpen(true)}
+          className="p-2 rounded-md hover:bg-muted text-foreground transition-colors"
+          title="Generate Documentation"
+        >
+          <FileText className="w-4 h-4" />
+        </button>
+
         {/* Export Dropdown */}
         <div className="relative">
           <button
@@ -334,6 +522,13 @@ export function Toolbar({ onSave, canvasRef }: ToolbarProps) {
                 >
                   <FileText className="w-4 h-4" />
                   Export as SVG
+                </button>
+                <button
+                  onClick={exportAsJson}
+                  className="w-full px-3 py-2 text-sm text-left hover:bg-muted flex items-center gap-2 transition-colors"
+                >
+                  <Download className="w-4 h-4" />
+                  Export as JSON
                 </button>
               </div>
             </>

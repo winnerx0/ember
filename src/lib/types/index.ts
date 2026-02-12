@@ -41,6 +41,22 @@ export interface NodeData {
   implementation?: Implementation;
   metadata: Record<string, any>;
   description?: string;
+  // Microservice specific properties
+  techStack?: string;
+  databaseType?: string;
+  deploymentType?: string;
+  scalingStrategy?: "vertical" | "horizontal";
+  healthStatus?: "healthy" | "degraded" | "down";
+}
+
+// Edge Data Structure
+export interface EdgeData {
+  label?: string;
+  communicationType?: "rest" | "grpc" | "kafka" | "rabbitmq";
+  isAsync?: boolean;
+  authenticationType?: string;
+  latency?: number;
+  retryStrategy?: string;
 }
 
 // Diagram Node (extends React Flow Node)
@@ -60,7 +76,7 @@ export interface DiagramEdge {
   targetHandle?: string;
   type?: string;
   animated?: boolean;
-  label?: string;
+  data?: EdgeData;
 }
 
 // Complete Diagram
@@ -163,6 +179,13 @@ export interface Database {
       };
     };
   };
+}
+
+// Node Metrics for Observability Mode
+export interface NodeMetrics {
+  requestRate: number; // requests per second
+  errorRate: number; // percentage
+  latency: number; // milliseconds
 }
 
 // Category Metadata

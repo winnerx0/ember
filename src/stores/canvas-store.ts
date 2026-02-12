@@ -7,6 +7,7 @@ import type {
   DiagramNode,
   DiagramEdge,
   NodeCategory,
+  NodeMetrics,
 } from "@/lib/types";
 
 export type EdgeType = "default" | "straight" | "step" | "smoothstep";
@@ -48,6 +49,14 @@ interface CanvasState {
     edges: Edge[];
   }[];
   historyIndex: number;
+
+  // Analysis
+  highlightedNodes: Set<string>;
+  highlightedEdges: Set<string>;
+
+  // Observability
+  isObservabilityMode: boolean;
+  nodeMetrics: Map<string, NodeMetrics>;
 
   // UI state
   isPropertiesPanelOpen: boolean;
@@ -98,6 +107,14 @@ interface CanvasActions {
   addToHistory: () => void;
   clearHistory: () => void;
 
+  // Analysis actions
+  setHighlights: (nodeIds: string[], edgeIds: string[]) => void;
+  clearHighlights: () => void;
+
+  // Observability actions
+  toggleObservabilityMode: () => void;
+  setNodeMetrics: (metrics: Map<string, NodeMetrics>) => void;
+
   // UI actions
   togglePropertiesPanel: () => void;
   setIsSaving: (isSaving: boolean) => void;
@@ -124,12 +141,16 @@ const initialState: CanvasState = {
   nodes: [],
   edges: [],
   customElements: [],
-  edgeType: "default",
+  edgeType: "straight",
   selectedNodeId: null,
   selectedEdgeId: null,
   viewport: { x: 0, y: 0, zoom: 1 },
   history: [],
   historyIndex: -1,
+  highlightedNodes: new Set(),
+  highlightedEdges: new Set(),
+  isObservabilityMode: false,
+  nodeMetrics: new Map(),
   isPropertiesPanelOpen: false,
   isSaving: false,
 };
@@ -173,8 +194,13 @@ export const useCanvasStore = create<CanvasStore>((set, get) => ({
         label: data.label || "New Node",
         category: data.category || "service",
         metadata: data.metadata || {},
-        description: data.description,
+        description: data.description || "",
         implementation: data.implementation,
+        techStack: "",
+        databaseType: "",
+        deploymentType: "",
+        scalingStrategy: "horizontal",
+        healthStatus: "healthy",
       },
     };
 
@@ -216,10 +242,20 @@ export const useCanvasStore = create<CanvasStore>((set, get) => ({
     const newEdge: Edge = {
       ...edge,
       id: edge.id || nanoid(),
+      data: {
+        label: "New Connection",
+        communicationType: "rest",
+        isAsync: false,
+        authenticationType: "None",
+        latency: 100,
+        retryStrategy: "None",
+      },
     };
 
     set((state) => ({
       edges: [...state.edges, newEdge],
+      selectedEdgeId: newEdge.id,
+      isPropertiesPanelOpen: true,
     }));
 
     get().addToHistory();
@@ -228,7 +264,9 @@ export const useCanvasStore = create<CanvasStore>((set, get) => ({
   updateEdge: (id, data) => {
     set((state) => ({
       edges: state.edges.map((edge) =>
-        edge.id === id ? { ...edge, data: { ...edge.data, ...data } } : edge,
+        edge.id === id
+          ? { ...edge, data: { ...(edge.data || {}), ...data } }
+          : edge,
       ),
     }));
 
@@ -306,6 +344,20 @@ export const useCanvasStore = create<CanvasStore>((set, get) => ({
 
   clearHistory: () => set({ history: [], historyIndex: -1 }),
 
+  // Analysis actions
+  setHighlights: (nodeIds, edgeIds) =>
+    set({
+      highlightedNodes: new Set(nodeIds),
+      highlightedEdges: new Set(edgeIds),
+    }),
+  clearHighlights: () =>
+    set({ highlightedNodes: new Set(), highlightedEdges: new Set() }),
+
+  // Observability actions
+  toggleObservabilityMode: () =>
+    set((state) => ({ isObservabilityMode: !state.isObservabilityMode })),
+  setNodeMetrics: (metrics) => set({ nodeMetrics: metrics }),
+
   // UI actions
   togglePropertiesPanel: () =>
     set((state) => ({ isPropertiesPanelOpen: !state.isPropertiesPanelOpen })),
@@ -314,6 +366,7 @@ export const useCanvasStore = create<CanvasStore>((set, get) => ({
   // Load diagram
   loadDiagram: (diagram) => {
     set({
+      ...initialState,
       diagramId: diagram.id,
       diagramTitle: diagram.title,
       diagramDescription: diagram.description || "",

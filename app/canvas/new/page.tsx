@@ -8,6 +8,7 @@ import { FlowCanvas } from "@/components/canvas/flow-canvas";
 import { NodePalette } from "@/components/layout/node-palette";
 import { Toolbar } from "@/components/layout/toolbar";
 import { CustomElementModal } from "@/components/modals/custom-element-modal";
+import { DocumentationModal } from "@/components/modals/documentation-modal";
 import { useCanvasStore } from "@/stores/canvas-store";
 import { useCreateDiagram } from "@/lib/hooks/use-diagrams";
 import { Toaster } from "@/components/ui/toaster";
@@ -25,6 +26,7 @@ function NewCanvasEditor() {
   const router = useRouter();
   const canvasRef = useRef<HTMLDivElement>(null);
   const [isCustomModalOpen, setIsCustomModalOpen] = useState(false);
+  const [isDocumentationModalOpen, setIsDocumentationModalOpen] = useState(false);
   const {
     nodes,
     edges,
@@ -114,7 +116,7 @@ function NewCanvasEditor() {
   return (
     <SidebarProvider defaultOpen={true}>
       <div className="relative w-full h-screen flex overflow-hidden bg-background">
-        <Toolbar canvasRef={canvasRef} />
+        <Toolbar canvasRef={canvasRef} setIsDocumentationModalOpen={setIsDocumentationModalOpen} />
         <NodePalette
           onAddCustomElement={() => {
             console.log("onAddCustomElement called in new page");
@@ -131,6 +133,10 @@ function NewCanvasEditor() {
           isOpen={isCustomModalOpen}
           onClose={() => setIsCustomModalOpen(false)}
           onSave={handleCreateCustomElement}
+        />
+        <DocumentationModal
+          isOpen={isDocumentationModalOpen}
+          onClose={() => setIsDocumentationModalOpen(false)}
         />
         <Toaster />
       </div>

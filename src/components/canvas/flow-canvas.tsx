@@ -1,6 +1,6 @@
 "use client";
 
-import { useCallback, DragEvent } from "react";
+import { useCallback, DragEvent, useMemo } from "react";
 import ReactFlow, {
   Background,
   Controls,
@@ -25,28 +25,7 @@ import type { NodeData, NodeCategory } from "@/lib/types";
 
 import { LabeledEdge } from "@/components/edges/labeled-edge";
 import { Legend } from "@/components/canvas/legend";
-
-// Register custom node types
-const nodeTypes = {
-  client: BaseNode,
-  gateway: BaseNode,
-  loadbalancer: BaseNode,
-  service: BaseNode,
-  cache: BaseNode,
-  queue: BaseNode,
-  storage: BaseNode,
-  worker: BaseNode,
-  external: BaseNode,
-  custom: BaseNode,
-};
-
-// Register custom edge types
-const edgeTypes = {
-  default: LabeledEdge,
-  straight: LabeledEdge,
-  step: LabeledEdge,
-  smoothstep: LabeledEdge,
-};
+import { calculateFanOutCounts } from "@/lib/analysis/graph";
 
 const categoryLabels: Record<NodeCategory, string> = {
   client: "Client",
@@ -75,6 +54,54 @@ export function FlowCanvas() {
   } = useCanvasStore();
 
   const { screenToFlowPosition } = useReactFlow();
+
+  // Calculate fan-out counts
+  const fanOutCounts = useMemo(() => calculateFanOutCounts(nodes, edges), [nodes, edges]);
+
+  // Register custom node types, passing fanOutCount
+  const customNodeTypes = useMemo(
+    () => ({
+      client: (nodeProps: Node<NodeData>) => (
+        <BaseNode {...nodeProps} fanOutCount={fanOutCounts.get(nodeProps.id)} />
+      ),
+      gateway: (nodeProps: Node<NodeData>) => (
+        <BaseNode {...nodeProps} fanOutCount={fanOutCounts.get(nodeProps.id)} />
+      ),
+      loadbalancer: (nodeProps: Node<NodeData>) => (
+        <BaseNode {...nodeProps} fanOutCount={fanOutCounts.get(nodeProps.id)} />
+      ),
+      service: (nodeProps: Node<NodeData>) => (
+        <BaseNode {...nodeProps} fanOutCount={fanOutCounts.get(nodeProps.id)} />
+      ),
+      cache: (nodeProps: Node<NodeData>) => (
+        <BaseNode {...nodeProps} fanOutCount={fanOutCounts.get(nodeProps.id)} />
+      ),
+      queue: (nodeProps: Node<NodeData>) => (
+        <BaseNode {...nodeProps} fanOutCount={fanOutCounts.get(nodeProps.id)} />
+      ),
+      storage: (nodeProps: Node<NodeData>) => (
+        <BaseNode {...nodeProps} fanOutCount={fanOutCounts.get(nodeProps.id)} />
+      ),
+      worker: (nodeProps: Node<NodeData>) => (
+        <BaseNode {...nodeProps} fanOutCount={fanOutCounts.get(nodeProps.id)} />
+      ),
+      external: (nodeProps: Node<NodeData>) => (
+        <BaseNode {...nodeProps} fanOutCount={fanOutCounts.get(nodeProps.id)} />
+      ),
+      custom: (nodeProps: Node<NodeData>) => (
+        <BaseNode {...nodeProps} fanOutCount={fanOutCounts.get(nodeProps.id)} />
+      ),
+    }),
+    [fanOutCounts],
+  );
+
+  // Register custom edge types
+  const edgeTypes = {
+    default: LabeledEdge,
+    straight: LabeledEdge,
+    step: LabeledEdge,
+    smoothstep: LabeledEdge,
+  };
 
   // Handle node changes (position, selection, etc.)
   const onNodesChange: OnNodesChange = useCallback(
@@ -184,7 +211,7 @@ export function FlowCanvas() {
         onPaneClick={onPaneClick}
         onDragOver={onDragOver}
         onDrop={onDrop}
-        nodeTypes={nodeTypes}
+        nodeTypes={customNodeTypes} // Use customNodeTypes
         edgeTypes={edgeTypes}
         connectionMode={ConnectionMode.Loose}
         fitView
