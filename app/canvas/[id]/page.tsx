@@ -40,6 +40,7 @@ function CanvasEditor() {
     diagramDescription,
     isSaving,
     setIsSaving,
+    addCustomElement,
   } = useCanvasStore();
 
   // Load diagram data
@@ -217,13 +218,11 @@ function CanvasEditor() {
     description: string;
     icon: string;
   }) => {
-    // In a real implementation, this would save to the DB
-    // For now, we'll just show a success toast
+    addCustomElement(element);
     toast({
       title: "Custom Element Created",
       description: `${element.name} has been added to your library.`,
     });
-    // Here needed logic to add to palette or local store
   };
 
   if (isLoading) {

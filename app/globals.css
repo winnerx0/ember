@@ -146,7 +146,7 @@
 
 /* Base Node Styles */
 .node-card {
-  @apply bg-card/95 backdrop-blur-sm text-card-foreground rounded-lg overflow-hidden transition-all duration-200 border border-border/50;
+  @apply bg-card/95 backdrop-blur-sm text-card-foreground rounded-lg overflow-hidden border border-border/50;
 }
 
 .node-card:hover {
@@ -167,6 +167,7 @@
   stroke: hsl(var(--primary)) !important;
   stroke-width: 2.5px !important;
   opacity: 0.8 !important;
+  stroke-dasharray: none !important;
 }
 
 .react-flow__connectionline {
@@ -178,10 +179,4 @@
 /* Edge button styling */
 .react-flow__edge-textbg {
   fill: hsl(var(--card));
-}
-
-/* Smooth animations */
-.react-flow__node,
-.react-flow__edge {
-  transition: all 0.2s ease;
 }

@@ -78,7 +78,7 @@ export const BaseNode = memo(function BaseNode({
   return (
     <div
       className={cn(
-        "min-w-[200px] max-w-[300px] rounded-lg border p-3 transition-all duration-200",
+        "min-w-[200px] max-w-[300px] rounded-lg border p-3",
         "bg-card/95 backdrop-blur-sm",
         selected ? "scale-[1.02] border-primary" : "border-border/50",
         config.bgColor,

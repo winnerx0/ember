@@ -1,7 +1,6 @@
 "use client";
 
 import { DragEvent, useState } from "react";
-import { ScrollArea } from "@/components/ui/scroll-area";
 import { Separator } from "@/components/ui/separator";
 import { Button } from "@/components/ui/button";
 import {
@@ -12,8 +11,6 @@ import {
   SidebarGroup,
   SidebarGroupContent,
   SidebarGroupLabel,
-  SidebarMenu,
-  SidebarMenuItem,
   useSidebar,
 } from "@/components/ui/sidebar";
 import * as LucideIcons from "lucide-react";
@@ -24,6 +21,7 @@ import {
 } from "@/lib/constants/implementations";
 import type { NodeCategory } from "@/lib/types";
 import { ModeToggle } from "@/components/mode-toggle";
+import { useCanvasStore } from "@/stores/canvas-store";
 
 const SIDEBAR_WIDTH = "20rem";
 
@@ -52,6 +50,7 @@ function DraggableNode({
 
   const onDragStart = (event: DragEvent<HTMLDivElement>) => {
     event.dataTransfer.setData("application/reactflow", category);
+    event.dataTransfer.setData("application/reactflow-label", label);
     event.dataTransfer.effectAllowed = "move";
   };
 
@@ -97,6 +96,7 @@ interface NodePaletteProps {
 export function NodePalette({ onAddCustomElement }: NodePaletteProps) {
   const [searchQuery, setSearchQuery] = useState("");
   const { toggleSidebar } = useSidebar();
+  const { customElements, deleteCustomElement } = useCanvasStore();
 
   const categories = Object.entries(CATEGORY_CONFIGS)
     .filter(([key]) => key !== "custom")
@@ -107,7 +107,11 @@ export function NodePalette({ onAddCustomElement }: NodePaletteProps) {
     );
 
   return (
-    <Sidebar collapsible="offcanvas" className="border-r" style={{ "--sidebar-width": SIDEBAR_WIDTH } as React.CSSProperties}>
+    <Sidebar
+      collapsible="offcanvas"
+      className="border-r"
+      style={{ "--sidebar-width": SIDEBAR_WIDTH } as React.CSSProperties}
+    >
       <SidebarHeader className="border-b p-0">
         <div className="flex items-center justify-between px-4 py-3">
           <h2 className="text-lg font-semibold">Components</h2>
@@ -187,11 +191,71 @@ export function NodePalette({ onAddCustomElement }: NodePaletteProps) {
             </div>
           </SidebarGroupContent>
         </SidebarGroup>
+
+        {/* Custom Elements Section */}
+        {customElements.length > 0 && (
+          <>
+            <Separator className="my-4" />
+            <SidebarGroup>
+              <SidebarGroupLabel>Custom Elements</SidebarGroupLabel>
+              <SidebarGroupContent>
+                <div className="px-2 space-y-2">
+                  {customElements
+                    .filter(
+                      (el) =>
+                        el.name
+                          .toLowerCase()
+                          .includes(searchQuery.toLowerCase()) ||
+                        el.description
+                          .toLowerCase()
+                          .includes(searchQuery.toLowerCase()),
+                    )
+                    .map((element) => {
+                      const config =
+                        CATEGORY_CONFIGS[element.category as NodeCategory] ||
+                        CATEGORY_CONFIGS.custom;
+                      return (
+                        <div key={element.id} className="relative group/custom">
+                          <DraggableNode
+                            category={element.category as NodeCategory}
+                            label={element.name}
+                            icon={element.icon}
+                            color={config.color}
+                            bgColor={config.bgColor}
+                            borderColor={config.borderColor}
+                            description={element.description}
+                          />
+                          <button
+                            onClick={(e) => {
+                              e.stopPropagation();
+                              deleteCustomElement(element.id);
+                            }}
+                            className="absolute top-1.5 right-1.5 p-1 rounded-md bg-destructive/90 text-destructive-foreground opacity-0 group-hover/custom:opacity-100 transition-opacity hover:bg-destructive"
+                            title="Remove custom element"
+                          >
+                            <LucideIcons.X className="w-3 h-3" />
+                          </button>
+                        </div>
+                      );
+                    })}
+                </div>
+              </SidebarGroupContent>
+            </SidebarGroup>
+          </>
+        )}
       </SidebarContent>
 
       <SidebarFooter className="border-t p-4">
         <Button
-          onClick={onAddCustomElement}
+          onClick={() => {
+            console.log("Button clicked!");
+            console.log("onAddCustomElement exists:", !!onAddCustomElement);
+            if (onAddCustomElement) {
+              onAddCustomElement();
+            } else {
+              console.error("onAddCustomElement is undefined!");
+            }
+          }}
           className="w-full"
           variant="outline"
         >

@@ -43,6 +43,8 @@ const nodeTypes = {
 // Register custom edge types
 const edgeTypes = {
   default: LabeledEdge,
+  straight: LabeledEdge,
+  step: LabeledEdge,
   smoothstep: LabeledEdge,
 };
 
@@ -63,6 +65,7 @@ export function FlowCanvas() {
   const {
     nodes,
     edges,
+    edgeType,
     setNodes,
     setEdges,
     addEdge: addEdgeToStore,
@@ -94,13 +97,13 @@ export function FlowCanvas() {
     (connection) => {
       const newEdge = {
         ...connection,
-        type: "smoothstep",
-        animated: true,
+        type: edgeType,
+        animated: false,
       } as Edge;
 
       addEdgeToStore(newEdge);
     },
-    [addEdgeToStore],
+    [addEdgeToStore, edgeType],
   );
 
   // Handle node click
@@ -144,6 +147,11 @@ export function FlowCanvas() {
         return;
       }
 
+      // Get custom label if set (for custom elements)
+      const customLabel = event.dataTransfer.getData(
+        "application/reactflow-label",
+      );
+
       // Get position where user dropped the node
       const position = screenToFlowPosition({
         x: event.clientX,
@@ -153,7 +161,7 @@ export function FlowCanvas() {
       addNode(
         category,
         {
-          label: categoryLabels[category] || "New Node",
+          label: customLabel || categoryLabels[category] || "New Node",
           category,
           metadata: {},
         },
@@ -182,8 +190,8 @@ export function FlowCanvas() {
         fitView
         className="bg-background"
         defaultEdgeOptions={{
-          type: "smoothstep",
-          animated: true,
+          type: edgeType,
+          animated: false,
         }}
       >
         {/* Grid background */}
@@ -203,10 +211,7 @@ export function FlowCanvas() {
         />
 
         {/* Controls */}
-        <Controls
-          showInteractive={false}
-          position="top-right"
-        />
+        <Controls showInteractive={false} position="top-right" />
 
         {/* Legend */}
         {/* <Legend /> */}

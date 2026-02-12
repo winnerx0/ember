@@ -25,8 +25,14 @@ function NewCanvasEditor() {
   const router = useRouter();
   const canvasRef = useRef<HTMLDivElement>(null);
   const [isCustomModalOpen, setIsCustomModalOpen] = useState(false);
-  const { nodes, edges, diagramTitle, diagramDescription, setIsSaving } =
-    useCanvasStore();
+  const {
+    nodes,
+    edges,
+    diagramTitle,
+    diagramDescription,
+    setIsSaving,
+    addCustomElement,
+  } = useCanvasStore();
   const createDiagram = useCreateDiagram();
   const { toast } = useToast();
   const [hasUnsavedChanges, setHasUnsavedChanges] = useState(false);
@@ -96,17 +102,25 @@ function NewCanvasEditor() {
     description: string;
     icon: string;
   }) => {
+    addCustomElement(element);
     toast({
       title: "Custom Element Created",
       description: `${element.name} has been added to your library.`,
     });
   };
 
+  console.log("NewCanvasEditor - isCustomModalOpen:", isCustomModalOpen);
+
   return (
     <SidebarProvider defaultOpen={true}>
       <div className="relative w-full h-screen flex overflow-hidden bg-background">
         <Toolbar canvasRef={canvasRef} />
-        <NodePalette onAddCustomElement={() => setIsCustomModalOpen(true)} />
+        <NodePalette
+          onAddCustomElement={() => {
+            console.log("onAddCustomElement called in new page");
+            setIsCustomModalOpen(true);
+          }}
+        />
         <SidebarInset className="flex-1 relative">
           <SidebarToggleButton />
           <div className="w-full h-full" ref={canvasRef}>

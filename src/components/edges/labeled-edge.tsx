@@ -4,11 +4,37 @@ import { memo, useState, useCallback } from "react";
 import {
   EdgeProps,
   getBezierPath,
+  getStraightPath,
+  getSmoothStepPath,
   EdgeLabelRenderer,
   BaseEdge,
 } from "reactflow";
 import { cn } from "@/lib/utils";
 import { useCanvasStore } from "@/stores/canvas-store";
+
+function useEdgePath(
+  type: string | undefined,
+  params: {
+    sourceX: number;
+    sourceY: number;
+    sourcePosition: any;
+    targetX: number;
+    targetY: number;
+    targetPosition: any;
+  },
+) {
+  switch (type) {
+    case "straight":
+      return getStraightPath(params);
+    case "step":
+      return getSmoothStepPath({ ...params, borderRadius: 0 });
+    case "smoothstep":
+      return getSmoothStepPath(params);
+    case "default":
+    default:
+      return getBezierPath(params);
+  }
+}
 
 export const LabeledEdge = memo(function LabeledEdge({
   id,
@@ -22,11 +48,11 @@ export const LabeledEdge = memo(function LabeledEdge({
   markerEnd,
   data,
 }: EdgeProps<{ label?: string }>) {
-  const { updateEdge } = useCanvasStore();
+  const { updateEdge, edgeType } = useCanvasStore();
   const [isEditing, setIsEditing] = useState(false);
   const [labelValue, setLabelValue] = useState(data?.label || "");
 
-  const [edgePath, labelX, labelY] = getBezierPath({
+  const [edgePath, labelX, labelY] = useEdgePath(edgeType, {
     sourceX,
     sourceY,
     sourcePosition,
@@ -65,9 +91,10 @@ export const LabeledEdge = memo(function LabeledEdge({
         markerEnd={markerEnd}
         style={{
           ...style,
-          strokeWidth: 2.5,
+          strokeWidth: 2,
           stroke: "hsl(var(--foreground))",
           opacity: 0.7,
+          strokeDasharray: "none",
         }}
       />
       <EdgeLabelRenderer>

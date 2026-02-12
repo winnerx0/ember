@@ -15,9 +15,14 @@ import {
   Layers,
   FileText,
   PenLine,
+  Spline,
+  Minus,
+  CornerDownRight,
+  GitBranch,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { useCanvasStore } from "@/stores/canvas-store";
+import type { EdgeType } from "@/stores/canvas-store";
 
 interface ToolbarProps {
   onSave?: () => void;
@@ -30,6 +35,8 @@ export function Toolbar({ onSave, canvasRef }: ToolbarProps) {
   const [titleValue, setTitleValue] = useState("");
   const titleInputRef = useRef<HTMLInputElement>(null);
 
+  const [isEdgeTypeMenuOpen, setIsEdgeTypeMenuOpen] = useState(false);
+
   const {
     diagramTitle,
     setDiagramTitle,
@@ -38,7 +45,44 @@ export function Toolbar({ onSave, canvasRef }: ToolbarProps) {
     redo,
     canUndo,
     canRedo,
+    edgeType,
+    setEdgeType,
   } = useCanvasStore();
+
+  const edgeTypeOptions: {
+    type: EdgeType;
+    label: string;
+    icon: React.ReactNode;
+    description: string;
+  }[] = [
+    {
+      type: "default",
+      label: "Bezier",
+      icon: <Spline className="w-4 h-4" />,
+      description: "Smooth curved line",
+    },
+    {
+      type: "straight",
+      label: "Straight",
+      icon: <Minus className="w-4 h-4" />,
+      description: "Direct straight line",
+    },
+    {
+      type: "step",
+      label: "Step",
+      icon: <CornerDownRight className="w-4 h-4" />,
+      description: "Right-angle connectors",
+    },
+    {
+      type: "smoothstep",
+      label: "Smooth Step",
+      icon: <GitBranch className="w-4 h-4" />,
+      description: "Rounded right-angle",
+    },
+  ];
+
+  const currentEdgeOption =
+    edgeTypeOptions.find((o) => o.type === edgeType) || edgeTypeOptions[0];
 
   // Handle title edit
   const handleTitleClick = useCallback(() => {
@@ -184,6 +228,68 @@ export function Toolbar({ onSave, canvasRef }: ToolbarProps) {
         >
           <Redo2 className="w-4 h-4" />
         </button>
+
+        {/* Divider */}
+        <div className="w-px h-6 bg-border mx-1" />
+
+        {/* Edge Type Dropdown */}
+        <div className="relative">
+          <button
+            onClick={() => setIsEdgeTypeMenuOpen(!isEdgeTypeMenuOpen)}
+            className="p-2 rounded-md hover:bg-muted text-foreground transition-colors flex items-center gap-1.5"
+            title={`Edge Type: ${currentEdgeOption.label}`}
+          >
+            {currentEdgeOption.icon}
+            <ChevronDown className="w-3 h-3" />
+          </button>
+
+          {isEdgeTypeMenuOpen && (
+            <>
+              <div
+                className="fixed inset-0 z-40"
+                onClick={() => setIsEdgeTypeMenuOpen(false)}
+              />
+              <div className="absolute left-1/2 -translate-x-1/2 top-full mt-1 bg-card border border-border rounded-lg shadow-xl z-50 min-w-[180px] py-1">
+                <div className="px-3 py-1.5 text-[10px] font-semibold text-muted-foreground uppercase tracking-wider">
+                  Edge Line Style
+                </div>
+                {edgeTypeOptions.map((option) => (
+                  <button
+                    key={option.type}
+                    onClick={() => {
+                      setEdgeType(option.type);
+                      setIsEdgeTypeMenuOpen(false);
+                    }}
+                    className={cn(
+                      "w-full px-3 py-2 text-sm text-left hover:bg-muted flex items-center gap-3 transition-colors",
+                      edgeType === option.type && "bg-primary/10 text-primary",
+                    )}
+                  >
+                    <span
+                      className={cn(
+                        "flex items-center justify-center w-7 h-7 rounded-md border",
+                        edgeType === option.type
+                          ? "border-primary bg-primary/10"
+                          : "border-border bg-muted/50",
+                      )}
+                    >
+                      {option.icon}
+                    </span>
+                    <div>
+                      <div className="font-medium">{option.label}</div>
+                      <div className="text-[10px] text-muted-foreground">
+                        {option.description}
+                      </div>
+                    </div>
+                    {edgeType === option.type && (
+                      <Check className="w-4 h-4 ml-auto text-primary" />
+                    )}
+                  </button>
+                ))}
+              </div>
+            </>
+          )}
+        </div>
 
         {/* Divider */}
         <div className="w-px h-6 bg-border mx-1" />

@@ -1,7 +1,23 @@
 import { create } from "zustand";
+import { persist } from "zustand/middleware";
 import { nanoid } from "nanoid";
 import type { Node, Edge, Viewport } from "reactflow";
-import type { NodeData, DiagramNode, DiagramEdge } from "@/lib/types";
+import type {
+  NodeData,
+  DiagramNode,
+  DiagramEdge,
+  NodeCategory,
+} from "@/lib/types";
+
+export type EdgeType = "default" | "straight" | "step" | "smoothstep";
+
+export interface CustomElement {
+  id: string;
+  name: string;
+  category: NodeCategory;
+  description: string;
+  icon: string;
+}
 
 interface CanvasState {
   // Diagram metadata
@@ -12,6 +28,12 @@ interface CanvasState {
   // Canvas data
   nodes: Node<NodeData>[];
   edges: Edge[];
+
+  // Custom elements
+  customElements: CustomElement[];
+
+  // Edge type
+  edgeType: EdgeType;
 
   // Selection
   selectedNodeId: string | null;
@@ -37,6 +59,13 @@ interface CanvasActions {
   setDiagramId: (id: string | null) => void;
   setDiagramTitle: (title: string) => void;
   setDiagramDescription: (description: string) => void;
+
+  // Custom element actions
+  addCustomElement: (element: Omit<CustomElement, "id">) => void;
+  deleteCustomElement: (id: string) => void;
+
+  // Edge type actions
+  setEdgeType: (edgeType: EdgeType) => void;
 
   // Node actions
   addNode: (
@@ -94,6 +123,8 @@ const initialState: CanvasState = {
   diagramDescription: "",
   nodes: [],
   edges: [],
+  customElements: [],
+  edgeType: "default",
   selectedNodeId: null,
   selectedEdgeId: null,
   viewport: { x: 0, y: 0, zoom: 1 },
@@ -111,6 +142,26 @@ export const useCanvasStore = create<CanvasStore>((set, get) => ({
   setDiagramTitle: (title) => set({ diagramTitle: title }),
   setDiagramDescription: (description) =>
     set({ diagramDescription: description }),
+
+  // Custom element actions
+  addCustomElement: (element) => {
+    const newElement: CustomElement = {
+      ...element,
+      id: nanoid(),
+    };
+    set((state) => ({
+      customElements: [...state.customElements, newElement],
+    }));
+  },
+
+  deleteCustomElement: (id) => {
+    set((state) => ({
+      customElements: state.customElements.filter((el) => el.id !== id),
+    }));
+  },
+
+  // Edge type actions
+  setEdgeType: (edgeType) => set({ edgeType }),
 
   // Node actions
   addNode: (type, data, position) => {
