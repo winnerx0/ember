@@ -3,3 +3,4 @@
 .vscode
 .tanstack
 app.config*.js
+/src/db/migrations

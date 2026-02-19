@@ -111,12 +111,6 @@ export const exportSQL = createServerFn({ method: "GET" })
       relationships.forEach((rel, idx) => {
         const sourceTable = tableNameMap[rel.sourceTableId];
         const targetTable = tableNameMap[rel.targetTableId];
-        const sourceCol = rel.sourceColumnId
-          ? columnNameMap[rel.sourceColumnId]
-          : "id";
-        const targetCol = rel.targetColumnId
-          ? columnNameMap[rel.targetColumnId]
-          : "id";
 
         if (sourceTable && targetTable) {
           // For one-to-many and one-to-one: FK is on the child (target) table

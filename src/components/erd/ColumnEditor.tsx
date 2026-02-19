@@ -4,6 +4,7 @@ import { Button } from "~/components/ui/button";
 import { Input } from "~/components/ui/input";
 import { Label } from "~/components/ui/label";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "~/components/ui/select";
+import { Checkbox } from "~/components/ui/checkbox";
 
 const PG_TYPES = [
   "uuid",
@@ -255,27 +256,34 @@ export function ColumnEditor({ table, onSave, onClose }: Props) {
                     {[
                       { key: "isPrimary", label: "PK" },
                       { key: "isUnique", label: "Unique" },
-                      { key: "nullable", label: "Nullable" },
                     ].map(({ key, label }) => (
                       <label
                         key={key}
-                        className="flex items-center gap-1.5 cursor-pointer"
+                        className="flex items-center gap-2 cursor-pointer"
                       >
-                        <input
-                          type="checkbox"
+                        <Checkbox
                           checked={col[key as keyof ColumnDraft] as boolean}
-                          onChange={(e) =>
+                          onChange={(e: React.ChangeEvent<HTMLInputElement>) =>
                             updateColumn(
                               col.id,
                               key as keyof ColumnDraft,
                               e.target.checked,
                             )
                           }
-                          className="w-3 h-3"
                         />
                         <span className="text-xs" style={{ color: "var(--muted-foreground)" }}>{label}</span>
                       </label>
                     ))}
+                    {/* Required checkbox (inverse of nullable) */}
+                    <label className="flex items-center gap-2 cursor-pointer">
+                      <Checkbox
+                        checked={!col.nullable}
+                        onChange={(e: React.ChangeEvent<HTMLInputElement>) =>
+                          updateColumn(col.id, "nullable", !e.target.checked)
+                        }
+                      />
+                      <span className="text-xs" style={{ color: "var(--muted-foreground)" }}>Required</span>
+                    </label>
                   </div>
 
                   {/* Default value */}

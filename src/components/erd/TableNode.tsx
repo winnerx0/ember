@@ -129,86 +129,77 @@ export const TableNode = memo(({ data, selected }: NodeProps) => {
             No columns — click to add
           </div>
         ) : (
-          columns.map((col, idx) => (
-            <div key={col.id} className="relative table-node-column group/col">
-              {/* Left handle (target) */}
-              <Handle
-                type="target"
-                position={Position.Left}
-                id={`${col.id}-target`}
-                style={{
-                  top: "50%",
-                  left: -5,
-                  transform: "translateY(-50%)",
-                  opacity: hovered ? 1 : 0,
-                  transition: "opacity 0.15s",
-                }}
-              />
+          columns.map((col, idx) => {
+            // Check if this is a foreign key column (ends with _id)
+            const isForeignKey = col.name.endsWith('_id') && !col.isPrimary;
 
-              {/* PK / FK badge */}
-              <div className="w-6 flex-shrink-0 flex items-center justify-center">
-                {col.isPrimary ? (
-                  <span className="text-yellow-400 text-[9px] font-black">
-                    PK
-                  </span>
-                ) : col.isUnique ? (
-                  <span className="text-blue-400 text-[9px] font-bold">UQ</span>
-                ) : (
-                  <span className="text-[9px]" style={{ color: "var(--muted-foreground)" }}>—</span>
-                )}
+            return (
+              <div key={col.id} className="relative table-node-column group/col">
+                {/* PK / FK / UQ badge */}
+                <div className="w-6 flex-shrink-0 flex items-center justify-center">
+                  {col.isPrimary ? (
+                    <span className="text-yellow-400 text-[9px] font-black">
+                      PK
+                    </span>
+                  ) : isForeignKey ? (
+                    <span className="text-blue-400 text-[9px] font-black">
+                      FK
+                    </span>
+                  ) : col.isUnique ? (
+                    <span className="text-purple-400 text-[9px] font-bold">UQ</span>
+                  ) : (
+                    <span className="text-[9px]" style={{ color: "var(--muted-foreground)" }}>—</span>
+                  )}
+                </div>
+
+                {/* Required/Nullable indicator */}
+                <span className="text-[10px] mr-1" style={{ color: "var(--muted-foreground)" }}>
+                  {col.nullable ? "○" : "#"}
+                </span>
+
+                {/* Column name */}
+                <span className="flex-1 text-xs truncate" style={{ color: "var(--card-foreground)" }}>
+                  {col.name}
+                </span>
+
+                {/* Type badge */}
+                <span
+                  className="text-[9px] font-mono px-1.5 py-0.5 rounded"
+                  style={{
+                    color: getTypeColor(col.type),
+                    background: `${getTypeColor(col.type)}15`,
+                  }}
+                >
+                  {shortType(col.type)}
+                </span>
               </div>
-
-              {/* Column name */}
-              <span className="flex-1 text-xs truncate" style={{ color: "var(--card-foreground)" }}>
-                {col.name}
-              </span>
-
-              {/* Type badge */}
-              <span
-                className="text-[9px] font-mono px-1.5 py-0.5 rounded"
-                style={{
-                  color: getTypeColor(col.type),
-                  background: `${getTypeColor(col.type)}15`,
-                }}
-              >
-                {shortType(col.type)}
-              </span>
-
-              {/* Nullable indicator */}
-              {col.nullable && !col.isPrimary && (
-                <span className="text-[9px] ml-1" style={{ color: "var(--muted-foreground)" }}>?</span>
-              )}
-
-              {/* Right handle (source) */}
-              <Handle
-                type="source"
-                position={Position.Right}
-                id={`${col.id}-source`}
-                style={{
-                  top: "50%",
-                  right: -5,
-                  transform: "translateY(-50%)",
-                  opacity: hovered ? 1 : 0,
-                  transition: "opacity 0.15s",
-                }}
-              />
-            </div>
-          ))
+            );
+          })
         )}
       </div>
 
-      {/* Table handle (whole-table connections) */}
+      {/* Single table-level handles for connections */}
       <Handle
         type="target"
         position={Position.Left}
         id={`${nodeData.id}-table-target`}
-        style={{ top: "50%", left: -5, opacity: 0 }}
+        style={{
+          top: "50%",
+          left: -5,
+          opacity: hovered ? 1 : 0,
+          transition: "opacity 0.15s",
+        }}
       />
       <Handle
         type="source"
         position={Position.Right}
         id={`${nodeData.id}-table-source`}
-        style={{ top: "50%", right: -5, opacity: 0 }}
+        style={{
+          top: "50%",
+          right: -5,
+          opacity: hovered ? 1 : 0,
+          transition: "opacity 0.15s",
+        }}
       />
     </div>
   );

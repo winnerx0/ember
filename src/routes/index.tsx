@@ -319,15 +319,15 @@ export default function LandingPage() {
         <div className="flex items-center gap-2 sm:gap-3">
           <ThemeToggle />
           <Link
-            to="/app"
+            to="/auth"
             className="px-3 sm:px-4 py-1.5 sm:py-2 rounded-lg text-xs sm:text-sm font-semibold transition-all duration-200 hover:scale-105"
             style={{
               background: "var(--primary)",
               color: "var(--primary-foreground)"
             }}
           >
-            <span className="hidden sm:inline">Open App →</span>
-            <span className="sm:hidden">App →</span>
+            <span className="hidden sm:inline">Sign In →</span>
+            <span className="sm:hidden">Sign In →</span>
           </Link>
         </div>
       </nav>
@@ -358,7 +358,7 @@ export default function LandingPage() {
 
             <div className="flex flex-col sm:flex-row flex-wrap gap-3 sm:gap-4">
               <Link
-                to="/app"
+                to="/auth"
                 className="group flex items-center justify-center gap-2 px-5 sm:px-6 py-2.5 sm:py-3 rounded-xl font-semibold text-sm sm:text-base transition-all duration-200 hover:scale-105 hover:shadow-2xl"
                 style={{
                   background: "var(--primary)",
@@ -610,105 +610,6 @@ export default function LandingPage() {
         </div>
       </section>
 
-      {/* Use Cases / Who is it for */}
-      <section className="py-16 sm:py-20 md:py-24 px-4 sm:px-6" style={{ background: "var(--accent)" }}>
-        <div className="max-w-7xl mx-auto">
-          <div className="text-center mb-12 sm:mb-16">
-            <h2 className="text-3xl sm:text-4xl font-black mb-3 sm:mb-4">
-              Built for <span style={{ color: "var(--primary)" }}>developers</span>
-            </h2>
-            <p className="text-base sm:text-lg max-w-2xl mx-auto" style={{ color: "var(--muted-foreground)" }}>
-              Whether you're prototyping or planning production schemas, Ember fits your workflow
-            </p>
-          </div>
-
-          <div className="grid sm:grid-cols-2 lg:grid-cols-3 gap-4 sm:gap-6">
-            {[
-              {
-                icon: "🚀",
-                title: "Rapid Prototyping",
-                desc: "Sketch out database schemas in minutes, not hours. Perfect for hackathons and MVPs.",
-              },
-              {
-                icon: "📚",
-                title: "Learning PostgreSQL",
-                desc: "Visual feedback helps you understand relationships, constraints, and best practices.",
-              },
-              {
-                icon: "👥",
-                title: "Team Collaboration",
-                desc: "Share your schema designs with teammates. Export SQL and iterate together.",
-              },
-              {
-                icon: "🔄",
-                title: "Migration Planning",
-                desc: "Plan database migrations visually before writing ALTER statements.",
-              },
-              {
-                icon: "📖",
-                title: "Documentation",
-                desc: "Generate visual documentation of your database structure automatically.",
-              },
-              {
-                icon: "🎯",
-                title: "Interview Prep",
-                desc: "Practice database design problems with instant visual feedback.",
-              },
-            ].map((useCase) => (
-              <div
-                key={useCase.title}
-                className="p-5 sm:p-6 rounded-2xl border transition-all duration-300 hover:-translate-y-1"
-                style={{ background: "var(--card)", borderColor: "var(--border)" }}
-              >
-                <div className="text-3xl sm:text-4xl mb-3 sm:mb-4">{useCase.icon}</div>
-                <h3 className="font-bold text-base sm:text-lg mb-2" style={{ color: "var(--card-foreground)" }}>
-                  {useCase.title}
-                </h3>
-                <p className="text-xs sm:text-sm leading-relaxed" style={{ color: "var(--muted-foreground)" }}>
-                  {useCase.desc}
-                </p>
-              </div>
-            ))}
-          </div>
-        </div>
-      </section>
-
-      {/* Tech Stack */}
-      <section className="py-16 sm:py-20 md:py-24 px-4 sm:px-6 max-w-7xl mx-auto">
-        <div className="text-center mb-12 sm:mb-16">
-          <h2 className="text-3xl sm:text-4xl font-black mb-3 sm:mb-4">
-            Built with <span style={{ color: "var(--primary)" }}>modern tech</span>
-          </h2>
-          <p className="text-base sm:text-lg max-w-2xl mx-auto" style={{ color: "var(--muted-foreground)" }}>
-            Powered by cutting-edge tools for performance and developer experience
-          </p>
-        </div>
-
-        <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-6 gap-4 sm:gap-6">
-          {[
-            { name: "React", desc: "UI Library" },
-            { name: "TanStack", desc: "Routing & SSR" },
-            { name: "React Flow", desc: "Canvas Engine" },
-            { name: "PostgreSQL", desc: "Database" },
-            { name: "Drizzle", desc: "ORM" },
-            { name: "Redis", desc: "Caching" },
-          ].map((tech) => (
-            <div
-              key={tech.name}
-              className="p-4 sm:p-5 rounded-xl border text-center transition-all duration-300 hover:scale-105"
-              style={{ background: "var(--card)", borderColor: "var(--border)" }}
-            >
-              <div className="font-bold text-sm sm:text-base mb-1" style={{ color: "var(--card-foreground)" }}>
-                {tech.name}
-              </div>
-              <div className="text-[10px] sm:text-xs" style={{ color: "var(--muted-foreground)" }}>
-                {tech.desc}
-              </div>
-            </div>
-          ))}
-        </div>
-      </section>
-
       {/* CTA */}
       <section className="py-16 sm:py-20 md:py-24 px-4 sm:px-6">
         <div
@@ -726,7 +627,7 @@ export default function LandingPage() {
             designing.
           </p>
           <Link
-            to="/app"
+            to="/auth"
             className="inline-flex items-center gap-2 sm:gap-3 px-6 sm:px-8 py-3 sm:py-4 rounded-xl font-bold text-base sm:text-lg transition-all duration-200 hover:scale-105"
             style={{
               background: "var(--primary)",

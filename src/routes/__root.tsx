@@ -4,6 +4,8 @@ import {
   Outlet,
   Scripts,
 } from "@tanstack/react-router";
+import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
+import { useState } from "react";
 import appCss from "~/styles/app.css?url";
 
 export const Route = createRootRoute({
@@ -26,14 +28,25 @@ export const Route = createRootRoute({
 });
 
 function RootComponent() {
+  const [queryClient] = useState(() => new QueryClient({
+    defaultOptions: {
+      queries: {
+        staleTime: 1000 * 60 * 5, // 5 minutes
+        refetchOnWindowFocus: false,
+      },
+    },
+  }));
+
   return (
     <html lang="en">
       <head>
         <HeadContent />
       </head>
       <body>
-        <Outlet />
-        <Scripts />
+        <QueryClientProvider client={queryClient}>
+          <Outlet />
+          <Scripts />
+        </QueryClientProvider>
       </body>
     </html>
   );

@@ -38,9 +38,10 @@ export const columnTypeEnum = pgEnum("column_type", [
   "bytea",
 ]);
 
-// Projects table
+// Projects table - user_id references Supabase auth.users
 export const projects = pgTable("projects", {
   id: text("id").primaryKey(),
+  userId: text("user_id").notNull(), // References Supabase auth.users
   name: text("name").notNull(),
   description: text("description"),
   createdAt: timestamp("created_at").defaultNow().notNull(),
@@ -77,33 +78,24 @@ export const erdColumns = pgTable("erd_columns", {
   createdAt: timestamp("created_at").defaultNow().notNull(),
 });
 
-// ERD Relationships (edges)
+// ERD Relationships (edges) - normalized, no FKs to everything
 export const erdRelationships = pgTable("erd_relationships", {
   id: text("id").primaryKey(),
-  projectId: text("project_id")
-    .notNull()
-    .references(() => projects.id, { onDelete: "cascade" }),
   sourceTableId: text("source_table_id")
     .notNull()
     .references(() => erdTables.id, { onDelete: "cascade" }),
-  sourceColumnId: text("source_column_id").references(() => erdColumns.id, {
-    onDelete: "set null",
-  }),
   targetTableId: text("target_table_id")
     .notNull()
     .references(() => erdTables.id, { onDelete: "cascade" }),
-  targetColumnId: text("target_column_id").references(() => erdColumns.id, {
-    onDelete: "set null",
-  }),
   type: text("type").notNull().default("one-to-many"),
   label: text("label"),
   createdAt: timestamp("created_at").defaultNow().notNull(),
 });
 
-// Relations
+// Relations - get relationships through tables
 export const projectsRelations = relations(projects, ({ many }) => ({
   tables: many(erdTables),
-  relationships: many(erdRelationships),
+  // userId references Supabase auth.users (no direct relation defined)
 }));
 
 export const erdTablesRelations = relations(erdTables, ({ one, many }) => ({
@@ -112,10 +104,10 @@ export const erdTablesRelations = relations(erdTables, ({ one, many }) => ({
     references: [projects.id],
   }),
   columns: many(erdColumns),
-  sourceRelationships: many(erdRelationships, {
+  outgoingRelationships: many(erdRelationships, {
     relationName: "sourceTable",
   }),
-  targetRelationships: many(erdRelationships, {
+  incomingRelationships: many(erdRelationships, {
     relationName: "targetTable",
   }),
 }));
@@ -130,10 +122,6 @@ export const erdColumnsRelations = relations(erdColumns, ({ one }) => ({
 export const erdRelationshipsRelations = relations(
   erdRelationships,
   ({ one }) => ({
-    project: one(projects, {
-      fields: [erdRelationships.projectId],
-      references: [projects.id],
-    }),
     sourceTable: one(erdTables, {
       fields: [erdRelationships.sourceTableId],
       references: [erdTables.id],
@@ -150,6 +138,7 @@ export const erdRelationshipsRelations = relations(
 // Types
 export type Project = typeof projects.$inferSelect;
 export type NewProject = typeof projects.$inferInsert;
+export type ProjectWithUserId = typeof projects.$inferSelect & { userId: string };
 export type ErdTable = typeof erdTables.$inferSelect;
 export type NewErdTable = typeof erdTables.$inferInsert;
 export type ErdColumn = typeof erdColumns.$inferSelect;

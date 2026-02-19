@@ -9,11 +9,8 @@ import { invalidateCache, CACHE_KEYS } from "~/lib/redis";
 export const addRelationship = createServerFn({ method: "POST" })
   .inputValidator(
     z.object({
-      projectId: z.string(),
       sourceTableId: z.string(),
-      sourceColumnId: z.string().optional(),
       targetTableId: z.string(),
-      targetColumnId: z.string().optional(),
       type: z
         .enum(["one-to-one", "one-to-many", "many-to-many"])
         .default("one-to-many"),
@@ -26,7 +23,14 @@ export const addRelationship = createServerFn({ method: "POST" })
       .insert(erdRelationships)
       .values({ id, ...data })
       .returning();
-    await invalidateCache(CACHE_KEYS.project(data.projectId));
+    // Get projectId from sourceTable for cache invalidation
+    const { table } = await import("~/db/schema");
+    const sourceTable = await db.query.erdTables.findFirst({
+      where: eq(table.id, data.sourceTableId),
+    });
+    if (sourceTable) {
+      await invalidateCache(CACHE_KEYS.project(sourceTable.projectId));
+    }
     return rel;
   });
 

@@ -1,7 +1,7 @@
 import { createServerFn } from "@tanstack/react-start";
 import { db } from "~/db";
 import { projects, erdTables, erdColumns, erdRelationships } from "~/db/schema";
-import { eq, desc } from "drizzle-orm";
+import { eq, desc, inArray, or } from "drizzle-orm";
 import { nanoid } from "nanoid";
 import { z } from "zod";
 import { getCache, setCache, invalidateCache, CACHE_KEYS } from "~/lib/redis";
@@ -45,13 +45,14 @@ export const createProject = createServerFn({ method: "POST" })
     z.object({
       name: z.string().min(1).max(100),
       description: z.string().optional(),
+      user_id: z.string(),
     }),
   )
   .handler(async ({ data }) => {
     const id = nanoid();
     const [project] = await db
       .insert(projects)
-      .values({ id, name: data.name, description: data.description })
+      .values({ id, name: data.name, description: data.description, user_id: data.user_id })
       .returning();
     await invalidateCache(CACHE_KEYS.projects());
     return project;
@@ -95,10 +96,20 @@ export const getProject = createServerFn({ method: "GET" })
           )
         : [];
 
-    const relationships = await db
-      .select()
-      .from(erdRelationships)
-      .where(eq(erdRelationships.projectId, data.id));
+    // Get relationships through tables (normalized schema)
+    const relationshipTableIds = tables.map((t) => t.id);
+    const relationships =
+      relationshipTableIds.length > 0
+        ? await db
+            .select()
+            .from(erdRelationships)
+            .where(
+              or(
+                inArray(erdRelationships.sourceTableId, relationshipTableIds),
+                inArray(erdRelationships.targetTableId, relationshipTableIds),
+              ),
+            )
+        : [];
 
     const result = {
       ...project,

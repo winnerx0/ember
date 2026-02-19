@@ -7,31 +7,149 @@ import {
 } from "@xyflow/react";
 
 export type RelationshipEdgeData = {
-  type: "one-to-one" | "one-to-many" | "many-to-many";
+  type: "one-to-one" | "one-to-many" | "many-to-one" | "many-to-many";
   label?: string;
   projectId: string;
   onDelete?: (id: string) => void;
-  onTypeChange?: (id: string, type: "one-to-one" | "one-to-many" | "many-to-many") => void;
+  onTypeChange?: (
+    id: string,
+    type: "one-to-one" | "one-to-many" | "many-to-one" | "many-to-many",
+  ) => void;
 };
 
-const CARDINALITY = {
-  "one-to-one": { source: "1", target: "1" },
-  "one-to-many": { source: "1", target: "∞" },
-  "many-to-many": { source: "∞", target: "∞" },
-};
-
-// Crow's foot notation markers
-// For "one" side: single perpendicular line
-// For "many" side: crow's foot (three lines)
-const getMarkerPath = (cardinality: "one" | "many") => {
-  if (cardinality === "one") {
-    // Single perpendicular line
-    return "M 0,-6 L 0,6";
-  } else {
-    // Crow's foot - three lines forming a fork
-    return "M 0,0 L -8,-6 M 0,0 L -8,0 M 0,0 L -8,6";
+/**
+ * Determine which side holds the FK based on relationship type.
+ */
+function getFKSides(type: string): {
+  source: boolean;
+  target: boolean;
+  junction: boolean;
+} {
+  switch (type) {
+    case "one-to-one":
+      return { source: false, target: true, junction: false };
+    case "one-to-many":
+      return { source: false, target: true, junction: false };
+    case "many-to-one":
+      return { source: true, target: false, junction: false };
+    case "many-to-many":
+      return { source: false, target: false, junction: true };
+    default:
+      return { source: false, target: true, junction: false };
   }
+}
+
+const TYPE_LABELS: Record<string, string> = {
+  "one-to-one": "1 : 1",
+  "one-to-many": "1 : N",
+  "many-to-one": "N : 1",
+  "many-to-many": "N : N",
 };
+
+/**
+ * Draw crow's foot marker lines at a connection point.
+ *
+ * @param cx      - x of the point on the edge (a small offset from the node)
+ * @param cy      - y of that point
+ * @param dx      - unit vector x from the node towards the interior of the edge
+ * @param dy      - unit vector y from the node towards the interior of the edge
+ * @param isMany  - whether to draw a crow's foot (many) or perpendicular line (one)
+ * @param color   - stroke color
+ * @param sw      - stroke width
+ */
+function CardinalityMarker({
+  cx,
+  cy,
+  dx,
+  dy,
+  isMany,
+  color,
+  sw,
+}: {
+  cx: number;
+  cy: number;
+  dx: number;
+  dy: number;
+  isMany: boolean;
+  color: string;
+  sw: number;
+}) {
+  // Perpendicular direction
+  const px = -dy;
+  const py = dx;
+  const SPREAD = 8; // how wide the perpendicular line / crow's foot is
+  const DEPTH = 10; // how far back the crow's foot prongs reach
+
+  if (isMany) {
+    // Crow's foot: three prongs fanning out from (cx, cy) backwards
+    // Center prong — straight back
+    const backX = cx - dx * DEPTH;
+    const backY = cy - dy * DEPTH;
+    // Top prong
+    const topX = backX + px * SPREAD;
+    const topY = backY + py * SPREAD;
+    // Bottom prong
+    const botX = backX - px * SPREAD;
+    const botY = backY - py * SPREAD;
+
+    return (
+      <g>
+        {/* Three prongs of the crow's foot */}
+        <line
+          x1={cx}
+          y1={cy}
+          x2={topX}
+          y2={topY}
+          stroke={color}
+          strokeWidth={sw}
+          strokeLinecap="round"
+        />
+        <line
+          x1={cx}
+          y1={cy}
+          x2={backX}
+          y2={backY}
+          stroke={color}
+          strokeWidth={sw}
+          strokeLinecap="round"
+        />
+        <line
+          x1={cx}
+          y1={cy}
+          x2={botX}
+          y2={botY}
+          stroke={color}
+          strokeWidth={sw}
+          strokeLinecap="round"
+        />
+        {/* Small perpendicular bar behind the fork for clarity */}
+        <line
+          x1={backX + px * SPREAD}
+          y1={backY + py * SPREAD}
+          x2={backX - px * SPREAD}
+          y2={backY - py * SPREAD}
+          stroke={color}
+          strokeWidth={sw}
+          strokeLinecap="round"
+          opacity={0.4}
+        />
+      </g>
+    );
+  } else {
+    // "One" side: single perpendicular bar
+    return (
+      <line
+        x1={cx + px * SPREAD}
+        y1={cy + py * SPREAD}
+        x2={cx - px * SPREAD}
+        y2={cy - py * SPREAD}
+        stroke={color}
+        strokeWidth={sw}
+        strokeLinecap="round"
+      />
+    );
+  }
+}
 
 export const RelationshipEdge = memo(
   ({
@@ -48,7 +166,7 @@ export const RelationshipEdge = memo(
     const edgeData = (data || {}) as RelationshipEdgeData;
     const { type = "one-to-many", label, onDelete, onTypeChange } = edgeData;
     const [showTypeMenu, setShowTypeMenu] = useState(false);
-    const cardinality = CARDINALITY[type] || CARDINALITY["one-to-many"];
+    const fkSides = getFKSides(type);
 
     const [edgePath, labelX, labelY] = getBezierPath({
       sourceX,
@@ -59,36 +177,46 @@ export const RelationshipEdge = memo(
       targetPosition,
     });
 
-    // Use CSS variable for color - will work in both light and dark mode
-    const primaryColor = getComputedStyle(document.documentElement)
-      .getPropertyValue('--primary')
-      .trim();
+    const sourceIsMany = type === "many-to-one" || type === "many-to-many";
+    const targetIsMany = type === "one-to-many" || type === "many-to-many";
 
-    // Determine marker types based on relationship type
-    // Source is the parent (where the FK originates from)
-    // Target is the child (where the FK points to)
-    let sourceMarkerType: "one" | "many" | null = null;
-    let targetMarkerType: "one" | "many" | null = null;
+    // Unit vector from source to target
+    const dxRaw = targetX - sourceX;
+    const dyRaw = targetY - sourceY;
+    const len = Math.sqrt(dxRaw * dxRaw + dyRaw * dyRaw) || 1;
+    const ux = dxRaw / len; // unit vector source→target
+    const uy = dyRaw / len;
 
-    switch (type) {
-      case "one-to-one":
-        // Parent has one, child has one
-        sourceMarkerType = "one";
-        targetMarkerType = "one";
-        break;
-      case "one-to-many":
-        // Parent has one, child has many
-        sourceMarkerType = "one";
-        targetMarkerType = "many";
-        break;
-      case "many-to-many":
-        // Both sides have many (junction table relationship)
-        sourceMarkerType = "many";
-        targetMarkerType = "many";
-        break;
-    }
+    // Marker offset from the node handle
+    const MARKER_DIST = 18;
 
-    const handleTypeChange = (newType: "one-to-one" | "one-to-many" | "many-to-many") => {
+    // Perpendicular direction for label offset (so FK label floats beside the line)
+    const perpX = -uy;
+    const perpY = ux;
+    const PERP_OFFSET = 16; // pixels perpendicular to edge
+
+    // Source marker: sits a bit away from source, pointing towards target
+    const srcMkX = sourceX + ux * MARKER_DIST;
+    const srcMkY = sourceY + uy * MARKER_DIST;
+
+    // Target marker: sits a bit away from target, pointing towards source
+    const tgtMkX = targetX - ux * MARKER_DIST;
+    const tgtMkY = targetY - uy * MARKER_DIST;
+
+    // FK labels positioned close to the node handle, offset perpendicular to the edge
+    const FK_ALONG_DIST = 28; // along the edge from the handle
+    const srcLblX = sourceX + ux * FK_ALONG_DIST + perpX * PERP_OFFSET;
+    const srcLblY = sourceY + uy * FK_ALONG_DIST + perpY * PERP_OFFSET;
+    const tgtLblX = targetX - ux * FK_ALONG_DIST + perpX * PERP_OFFSET;
+    const tgtLblY = targetY - uy * FK_ALONG_DIST + perpY * PERP_OFFSET;
+
+    const edgeColor = selected ? "var(--primary)" : "var(--muted-foreground)";
+    const strokeW = selected ? 2 : 1.5;
+    const edgeOpacity = selected ? 1 : 0.55;
+
+    const handleTypeChange = (
+      newType: "one-to-one" | "one-to-many" | "many-to-one" | "many-to-many",
+    ) => {
       if (onTypeChange) {
         onTypeChange(id, newType);
       }
@@ -97,59 +225,45 @@ export const RelationshipEdge = memo(
 
     return (
       <>
-        <defs>
-          {/* Source marker (parent side) */}
-          {sourceMarkerType && (
-            <marker
-              id={`marker-source-${id}`}
-              markerWidth="16"
-              markerHeight="16"
-              refX="0"
-              refY="0"
-              orient="auto-start-reverse"
-            >
-              <path
-                d={getMarkerPath(sourceMarkerType)}
-                stroke={primaryColor || "#f97316"}
-                strokeWidth="1.5"
-                fill="none"
-              />
-            </marker>
-          )}
-
-          {/* Target marker (child side) */}
-          {targetMarkerType && (
-            <marker
-              id={`marker-target-${id}`}
-              markerWidth="16"
-              markerHeight="16"
-              refX="0"
-              refY="0"
-              orient="auto"
-            >
-              <path
-                d={getMarkerPath(targetMarkerType)}
-                stroke={primaryColor || "#f97316"}
-                strokeWidth="1.5"
-                fill="none"
-              />
-            </marker>
-          )}
-        </defs>
-
+        {/* Main edge path */}
         <BaseEdge
           id={id}
           path={edgePath}
-          markerStart={sourceMarkerType ? `url(#marker-source-${id})` : undefined}
-          markerEnd={targetMarkerType ? `url(#marker-target-${id})` : undefined}
           style={{
-            stroke: primaryColor || "#f97316",
-            strokeWidth: selected ? 2.5 : 1.5,
-            opacity: selected ? 1 : 0.7,
+            stroke: edgeColor,
+            strokeWidth: strokeW,
+            opacity: edgeOpacity,
           }}
         />
+
+        {/* Source-side cardinality marker */}
+        <g opacity={edgeOpacity}>
+          <CardinalityMarker
+            cx={srcMkX}
+            cy={srcMkY}
+            dx={ux}
+            dy={uy}
+            isMany={sourceIsMany}
+            color={edgeColor}
+            sw={strokeW}
+          />
+        </g>
+
+        {/* Target-side cardinality marker */}
+        <g opacity={edgeOpacity}>
+          <CardinalityMarker
+            cx={tgtMkX}
+            cy={tgtMkY}
+            dx={-ux}
+            dy={-uy}
+            isMany={targetIsMany}
+            color={edgeColor}
+            sw={strokeW}
+          />
+        </g>
+
         <EdgeLabelRenderer>
-          {/* Center label with type selector */}
+          {/* Center label — type badge + controls */}
           <div
             style={{
               position: "absolute",
@@ -158,99 +272,176 @@ export const RelationshipEdge = memo(
               zIndex: 10,
             }}
           >
-            <div className="flex items-center gap-1">
-              {selected && (
-                <div className="flex items-center gap-1">
-                  <div className="relative">
-                    <button
-                      onClick={() => setShowTypeMenu(!showTypeMenu)}
-                      className="px-2 py-0.5 rounded-full text-[10px] font-semibold flex items-center gap-1 border transition-all hover:opacity-80"
+            <div className="flex items-center gap-1.5">
+              {/* Type badge */}
+              <div
+                className="relative px-2.5 py-1 rounded-full text-[10px] font-bold tracking-tight border cursor-pointer select-none"
+                style={{
+                  background: selected ? "var(--primary)" : "var(--card)",
+                  color: selected
+                    ? "var(--primary-foreground)"
+                    : "var(--muted-foreground)",
+                  borderColor: selected ? "var(--primary)" : "var(--border)",
+                  opacity: selected ? 1 : 0.85,
+                  boxShadow: selected
+                    ? "0 2px 12px rgba(0,0,0,0.25)"
+                    : "0 1px 4px rgba(0,0,0,0.15)",
+                }}
+                onClick={() => selected && setShowTypeMenu(!showTypeMenu)}
+              >
+                {label || TYPE_LABELS[type] || type}
+                {selected && (
+                  <span className="ml-1 text-[8px] opacity-60">▾</span>
+                )}
+
+                {/* Dropdown */}
+                {selected && showTypeMenu && (
+                  <div
+                    className="absolute top-full mt-2 left-1/2 -translate-x-1/2 rounded-xl border overflow-hidden z-50"
+                    style={{
+                      background: "var(--card)",
+                      borderColor: "var(--border)",
+                      boxShadow: "0 12px 40px rgba(0,0,0,0.35)",
+                      minWidth: 160,
+                    }}
+                  >
+                    <div
+                      className="px-3 py-1.5 text-[9px] uppercase tracking-widest font-bold border-b"
                       style={{
-                        background: "var(--card)",
+                        color: "var(--muted-foreground)",
                         borderColor: "var(--border)",
-                        color: "var(--primary)",
                       }}
                     >
-                      {label || type}
-                      <span className="text-[8px]">▼</span>
-                    </button>
-
-                    {showTypeMenu && (
-                      <div
-                        className="absolute top-full mt-1 left-0 rounded-lg border shadow-lg overflow-hidden min-w-[140px] z-50"
+                      Cardinality
+                    </div>
+                    {(
+                      [
+                        "one-to-one",
+                        "one-to-many",
+                        "many-to-one",
+                        "many-to-many",
+                      ] as const
+                    ).map((t) => (
+                      <button
+                        key={t}
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          handleTypeChange(t);
+                        }}
+                        className="w-full px-3 py-2 text-left text-xs transition-colors flex items-center justify-between gap-3"
                         style={{
-                          background: "var(--card)",
-                          borderColor: "var(--border)",
+                          background:
+                            type === t ? "var(--accent)" : "transparent",
+                          color: "var(--foreground)",
                         }}
                       >
-                        {(["one-to-one", "one-to-many", "many-to-many"] as const).map((t) => (
-                          <button
-                            key={t}
-                            onClick={() => handleTypeChange(t)}
-                            className="w-full px-3 py-2 text-left text-xs transition-all hover:bg-accent"
-                            style={{
-                              background: type === t ? "var(--accent)" : "transparent",
-                              color: "var(--foreground)",
-                            }}
-                          >
-                            {t}
-                          </button>
-                        ))}
-                      </div>
-                    )}
+                        <span className="font-medium">{t}</span>
+                        <span
+                          className="text-[10px] font-mono px-1.5 py-0.5 rounded font-bold"
+                          style={{
+                            background:
+                              type === t ? "var(--primary)" : "var(--muted)",
+                            color:
+                              type === t
+                                ? "var(--primary-foreground)"
+                                : "var(--muted-foreground)",
+                          }}
+                        >
+                          {TYPE_LABELS[t]}
+                        </span>
+                      </button>
+                    ))}
                   </div>
+                )}
+              </div>
 
-                  {onDelete && (
-                    <button
-                      onClick={() => onDelete(id)}
-                      className="px-1.5 py-0.5 rounded-full text-[10px] border transition-all hover:opacity-80"
-                      style={{
-                        background: "var(--card)",
-                        borderColor: "var(--border)",
-                        color: "var(--destructive)",
-                      }}
-                    >
-                      ✕
-                    </button>
-                  )}
-                </div>
+              {/* Delete button */}
+              {selected && onDelete && (
+                <button
+                  onClick={() => onDelete(id)}
+                  className="w-5 h-5 rounded-full flex items-center justify-center text-[9px] transition-all hover:scale-110 active:scale-95"
+                  style={{
+                    background: "var(--destructive)",
+                    color: "#fff",
+                    boxShadow: "0 2px 8px rgba(239,68,68,0.3)",
+                  }}
+                >
+                  ✕
+                </button>
               )}
             </div>
           </div>
 
-          {/* Source cardinality (parent side) */}
-          <div
-            style={{
-              position: "absolute",
-              transform: `translate(-50%, -50%) translate(${sourceX + (targetX > sourceX ? 20 : -20)}px,${sourceY}px)`,
-              pointerEvents: "none",
-              zIndex: 10,
-            }}
-          >
-            <span
-              className="text-[11px] font-bold"
-              style={{ color: "var(--primary)", opacity: 0.8 }}
+          {/* Source-side FK label — visible when FK is on source side */}
+          {fkSides.source && (
+            <div
+              style={{
+                position: "absolute",
+                transform: `translate(-50%, -50%) translate(${srcLblX}px,${srcLblY}px)`,
+                pointerEvents: "none",
+                zIndex: 10,
+              }}
             >
-              {cardinality.source}
-            </span>
-          </div>
+              <span
+                className="text-[9px] font-extrabold px-2 py-0.5 rounded-md tracking-wider shadow-sm"
+                style={{
+                  color: "#60a5fa",
+                  background: "rgba(96, 165, 250, 0.15)",
+                  border: "1px solid rgba(96, 165, 250, 0.3)",
+                  boxShadow: "0 1px 4px rgba(96, 165, 250, 0.15)",
+                }}
+              >
+                FK
+              </span>
+            </div>
+          )}
 
-          {/* Target cardinality (child side) */}
-          <div
-            style={{
-              position: "absolute",
-              transform: `translate(-50%, -50%) translate(${targetX + (targetX > sourceX ? -20 : 20)}px,${targetY}px)`,
-              pointerEvents: "none",
-              zIndex: 10,
-            }}
-          >
-            <span
-              className="text-[11px] font-bold"
-              style={{ color: "var(--primary)", opacity: 0.8 }}
+          {/* Target-side FK label — visible when FK is on target side */}
+          {fkSides.target && (
+            <div
+              style={{
+                position: "absolute",
+                transform: `translate(-50%, -50%) translate(${tgtLblX}px,${tgtLblY}px)`,
+                pointerEvents: "none",
+                zIndex: 10,
+              }}
             >
-              {cardinality.target}
-            </span>
-          </div>
+              <span
+                className="text-[9px] font-extrabold px-2 py-0.5 rounded-md tracking-wider shadow-sm"
+                style={{
+                  color: "#60a5fa",
+                  background: "rgba(96, 165, 250, 0.15)",
+                  border: "1px solid rgba(96, 165, 250, 0.3)",
+                  boxShadow: "0 1px 4px rgba(96, 165, 250, 0.15)",
+                }}
+              >
+                FK
+              </span>
+            </div>
+          )}
+
+          {/* Junction table hint for M:N */}
+          {fkSides.junction && selected && (
+            <div
+              style={{
+                position: "absolute",
+                transform: `translate(-50%, 14px) translate(${labelX}px,${labelY}px)`,
+                pointerEvents: "none",
+                zIndex: 10,
+              }}
+            >
+              <span
+                className="text-[8px] px-2 py-0.5 rounded-full font-medium whitespace-nowrap"
+                style={{
+                  color: "var(--chart-3)",
+                  background: "var(--card)",
+                  border: "1px solid var(--border)",
+                }}
+              >
+                needs junction table
+              </span>
+            </div>
+          )}
         </EdgeLabelRenderer>
       </>
     );
