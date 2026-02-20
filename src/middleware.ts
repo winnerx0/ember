@@ -1,28 +1,38 @@
 import { createMiddleware } from "@tanstack/react-start";
-import { supabase } from "~/lib/supabase";
+import { redirect } from "@tanstack/react-router";
+import { createSupabaseServerClient } from "~/lib/supabase";
 
-export const { re, getSession, redirect } = createMiddleware({
-  onRequest: async ({ request, url, next, cookies }) => {
-    // Public paths that don't require auth
-    const publicPaths = ["/", "/auth"];
-    const isPublicPath = publicPaths.includes(url.pathname) ||
-                        url.pathname.startsWith("/api") ||
-                        url.pathname.startsWith("/assets") ||
-                        url.pathname.includes("favicon");
+const publicPaths = ["/", "/auth"];
 
-    if (isPublicPath) {
-      return next();
-    }
+function isPublicPath(pathname: string): boolean {
+  return (
+    publicPaths.includes(pathname) ||
+    pathname.startsWith("/api") ||
+    pathname.startsWith("/assets") ||
+    pathname.includes("favicon")
+  );
+}
 
-    // Check for session - all /app routes require authentication
-    const { data: { session } } = await supabase.auth.getSession();
+export const authMiddleware = createMiddleware().server(async ({ next, request }) => {
+  const { pathname } = new URL(request.url);
 
-    if (!session) {
-      // Store the intended URL to redirect back after login
-      cookies.set("redirectTo", url.pathname, { path: "/" });
-      return redirect("/auth");
-    }
-
+  if (isPublicPath(pathname)) {
     return next();
-  },
+  }
+
+  // Create server-side Supabase client with cookie handling
+  const supabase = createSupabaseServerClient(request);
+
+  const {
+    data: { session },
+  } = await supabase.auth.getSession();
+
+  if (!session) {
+    throw redirect({
+      to: "/auth",
+      search: { redirectTo: pathname },
+    });
+  }
+
+  return next();
 });

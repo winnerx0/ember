@@ -3,6 +3,7 @@ import { useEffect, useState } from "react";
 import { supabase } from "~/lib/supabase";
 import { ThemeToggle } from "~/components/ThemeToggle";
 import { Spinner } from "~/components/ui/spinner";
+import { setSessionCookies, clearSessionCookies } from "~/server/auth";
 
 export const Route = createFileRoute("/auth")({
   component: AuthPage,
@@ -17,13 +18,24 @@ export default function AuthPage() {
     const checkSession = async () => {
       // Check if there's a hash in the URL (OAuth callback)
       if (window.location.hash.includes("access_token")) {
-        // Let Supabase process the hash first
+        // Exchange the hash for a session and set cookies
         const { data: { session }, error } = await supabase.auth.getSession();
 
         if (session && !error) {
           setUser(session.user);
-          // Clear the hash without triggering a page reload
-          window.history.replaceState(null, "", "/auth");
+
+          // Set the session in cookies for server-side access
+          await setSessionCookies({
+            data: {
+              access_token: session.access_token,
+              refresh_token: session.refresh_token
+            }
+          });
+
+          // Clear the hash and redirect to app
+          window.history.replaceState(null, "", "/app");
+          window.location.href = "/app";
+          return;
         }
       } else {
         // Check for existing session
@@ -39,8 +51,18 @@ export default function AuthPage() {
     checkSession();
 
     // Listen for auth changes
-    const { data: { subscription } } = supabase.auth.onAuthStateChange((_event, session) => {
+    const { data: { subscription } } = supabase.auth.onAuthStateChange(async (_event, session) => {
       setUser(session?.user || null);
+
+      // Update cookies when auth state changes
+      if (session) {
+        await setSessionCookies({
+          data: {
+            access_token: session.access_token,
+            refresh_token: session.refresh_token
+          }
+        });
+      }
     });
 
     return () => subscription.unsubscribe();
@@ -61,6 +83,8 @@ export default function AuthPage() {
 
   const handleSignOut = async () => {
     await supabase.auth.signOut();
+    // Clear server-side cookies
+    await clearSessionCookies();
     setUser(null);
   };
 

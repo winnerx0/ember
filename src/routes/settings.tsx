@@ -3,16 +3,10 @@ import { useState, useEffect } from "react";
 import { supabase } from "~/lib/supabase";
 import { ThemeToggle } from "~/components/ThemeToggle";
 import { Spinner } from "~/components/ui/spinner";
-import { redirect } from "@tanstack/react-router";
+import { clearSessionCookies } from "~/server/auth";
 
 export const Route = createFileRoute("/settings")({
   component: SettingsPage,
-  beforeLoad: async () => {
-    const { data: { session } } = await supabase.auth.getSession();
-    if (!session) {
-      throw redirect({ to: "/auth" });
-    }
-  },
 });
 
 export default function SettingsPage() {
@@ -30,6 +24,8 @@ export default function SettingsPage() {
 
   const handleSignOut = async () => {
     await supabase.auth.signOut();
+    // Clear server-side cookies
+    await clearSessionCookies();
     window.location.href = "/";
   };
 

@@ -11,17 +11,10 @@ import { ConfirmModal } from "~/components/ui/confirm-modal";
 import { Spinner } from "~/components/ui/spinner";
 import { supabase } from "~/lib/supabase";
 import { toast } from "sonner";
-import { redirect } from "@tanstack/react-router";
 import type { User } from "@supabase/supabase-js";
 
 export const Route = createFileRoute("/app/")({
   component: AppDashboard,
-  beforeLoad: async ({ context }) => {
-    const { data: { session } } = await supabase.auth.getSession();
-    if (!session) {
-      throw redirect({ to: "/auth" });
-    }
-  },
 });
 
 function ProjectCard({

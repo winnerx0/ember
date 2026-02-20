@@ -19,7 +19,6 @@ import {
 import "@xyflow/react/dist/style.css";
 import { useCallback, useState, useRef, useEffect } from "react";
 import { nanoid } from "nanoid";
-import { redirect } from "@tanstack/react-router";
 import { getProject } from "~/server/projects";
 import {
   addTable,
@@ -41,15 +40,10 @@ import { ThemeToggle } from "~/components/ThemeToggle";
 import { ConfirmModal } from "~/components/ui/confirm-modal";
 import { supabase } from "~/lib/supabase";
 import { toast } from "sonner";
+import { clearSessionCookies } from "~/server/auth";
 
 export const Route = createFileRoute("/app/$projectId")({
   loader: ({ params }) => getProject({ data: { id: params.projectId } }),
-  beforeLoad: async () => {
-    const { data: { session } } = await supabase.auth.getSession();
-    if (!session) {
-      throw redirect({ to: "/auth" });
-    }
-  },
   component: () => (
     <ReactFlowProvider>
       <ERDCanvas />
@@ -694,6 +688,8 @@ function ERDCanvas() {
   // Sign out
   const handleSignOut = useCallback(async () => {
     await supabase.auth.signOut();
+    // Clear server-side cookies
+    await clearSessionCookies();
     window.location.href = "/";
   }, []);
 
