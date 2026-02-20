@@ -2,9 +2,17 @@ import { createFileRoute, Link } from "@tanstack/react-router";
 import { useState, useEffect } from "react";
 import { supabase } from "~/lib/supabase";
 import { ThemeToggle } from "~/components/ThemeToggle";
+import { Spinner } from "~/components/ui/spinner";
+import { redirect } from "@tanstack/react-router";
 
 export const Route = createFileRoute("/profile")({
   component: ProfilePage,
+  beforeLoad: async () => {
+    const { data: { session } } = await supabase.auth.getSession();
+    if (!session) {
+      throw redirect({ to: "/auth" });
+    }
+  },
 });
 
 export default function ProfilePage() {
@@ -40,7 +48,7 @@ export default function ProfilePage() {
   if (loading) {
     return (
       <div className="min-h-screen flex items-center justify-center" style={{ background: "var(--background)" }}>
-        <div className="text-sm" style={{ color: "var(--muted-foreground)" }}>Loading...</div>
+        <Spinner size="lg" />
       </div>
     );
   }
@@ -133,9 +141,10 @@ export default function ProfilePage() {
             <button
               onClick={handleSave}
               disabled={saving}
-              className="px-6 py-2 rounded-lg font-medium transition-all hover:opacity-80 disabled:opacity-50"
+              className="px-6 py-2 rounded-lg font-medium transition-all hover:opacity-80 disabled:opacity-50 flex items-center gap-2"
               style={{ background: "var(--primary)", color: "var(--primary-foreground)" }}
             >
+              {saving && <Spinner size="sm" />}
               {saving ? "Saving..." : "Save Changes"}
             </button>
             <Link

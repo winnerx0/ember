@@ -55,7 +55,7 @@ export const erdTables = pgTable("erd_tables", {
     .notNull()
     .references(() => projects.id, { onDelete: "cascade" }),
   name: text("name").notNull(),
-  color: text("color").notNull().default("#f97316"),
+  color: text("color").notNull().default("#ffffff"),
   positionX: real("position_x").notNull().default(0),
   positionY: real("position_y").notNull().default(0),
   createdAt: timestamp("created_at").defaultNow().notNull(),
@@ -87,6 +87,13 @@ export const erdRelationships = pgTable("erd_relationships", {
   targetTableId: text("target_table_id")
     .notNull()
     .references(() => erdTables.id, { onDelete: "cascade" }),
+  sourceColumnId: text("source_column_id")
+    .notNull()
+    .references(() => erdColumns.id, { onDelete: "cascade" }),
+
+  targetColumnId: text("target_column_id")
+    .notNull()
+    .references(() => erdColumns.id, { onDelete: "cascade" }),
   type: text("type").notNull().default("one-to-many"),
   label: text("label"),
   createdAt: timestamp("created_at").defaultNow().notNull(),
@@ -95,7 +102,6 @@ export const erdRelationships = pgTable("erd_relationships", {
 // Relations - get relationships through tables
 export const projectsRelations = relations(projects, ({ many }) => ({
   tables: many(erdTables),
-  // userId references Supabase auth.users (no direct relation defined)
 }));
 
 export const erdTablesRelations = relations(erdTables, ({ one, many }) => ({
@@ -119,21 +125,28 @@ export const erdColumnsRelations = relations(erdColumns, ({ one }) => ({
   }),
 }));
 
-export const erdRelationshipsRelations = relations(
-  erdRelationships,
-  ({ one }) => ({
-    sourceTable: one(erdTables, {
-      fields: [erdRelationships.sourceTableId],
-      references: [erdTables.id],
-      relationName: "sourceTable",
-    }),
-    targetTable: one(erdTables, {
-      fields: [erdRelationships.targetTableId],
-      references: [erdTables.id],
-      relationName: "targetTable",
-    }),
+export const erdRelationshipsRelations = relations(erdRelationships, ({ one }) => ({
+  sourceTable: one(erdTables, {
+    fields: [erdRelationships.sourceTableId],
+    references: [erdTables.id],
+    relationName: "sourceTable",
   }),
-);
+  targetTable: one(erdTables, {
+    fields: [erdRelationships.targetTableId],
+    references: [erdTables.id],
+    relationName: "targetTable",
+  }),
+  sourceColumn: one(erdColumns, {
+    fields: [erdRelationships.sourceColumnId],
+    references: [erdColumns.id],
+    relationName: "sourceColumn",
+  }),
+  targetColumn: one(erdColumns, {
+    fields: [erdRelationships.targetColumnId],
+    references: [erdColumns.id],
+    relationName: "targetColumn",
+  }),
+}));
 
 // Types
 export type Project = typeof projects.$inferSelect;

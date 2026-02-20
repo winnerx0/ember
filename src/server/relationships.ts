@@ -11,8 +11,10 @@ export const addRelationship = createServerFn({ method: "POST" })
     z.object({
       sourceTableId: z.string(),
       targetTableId: z.string(),
+      sourceColumnId: z.string(),
+      targetColumnId: z.string(),
       type: z
-        .enum(["one-to-one", "one-to-many", "many-to-many"])
+        .enum(["one-to-one", "one-to-many", "many-to-one", "many-to-many"])
         .default("one-to-many"),
       label: z.string().optional(),
     }),
@@ -24,9 +26,9 @@ export const addRelationship = createServerFn({ method: "POST" })
       .values({ id, ...data })
       .returning();
     // Get projectId from sourceTable for cache invalidation
-    const { table } = await import("~/db/schema");
+    const { erdTables } = await import("~/db/schema");
     const sourceTable = await db.query.erdTables.findFirst({
-      where: eq(table.id, data.sourceTableId),
+      where: eq(erdTables.id, data.sourceTableId),
     });
     if (sourceTable) {
       await invalidateCache(CACHE_KEYS.project(sourceTable.projectId));
@@ -47,7 +49,7 @@ export const updateRelationship = createServerFn({ method: "POST" })
     z.object({
       id: z.string(),
       projectId: z.string(),
-      type: z.enum(["one-to-one", "one-to-many", "many-to-many"]).optional(),
+      type: z.enum(["one-to-one", "one-to-many", "many-to-one", "many-to-many"]).optional(),
       label: z.string().optional(),
     }),
   )

@@ -1,4 +1,4 @@
-import { useState, useEffect } from "react";
+import { useState } from "react";
 import { nanoid } from "nanoid";
 import { Button } from "~/components/ui/button";
 import { Input } from "~/components/ui/input";
@@ -29,12 +29,11 @@ const PG_TYPES = [
 ];
 
 const TABLE_COLORS = [
-  "var(--chart-1)",
-  "var(--chart-2)",
-  "var(--chart-3)",
-  "var(--chart-4)",
-  "var(--chart-5)",
-  "var(--primary)",
+  "var(--chart-1)", // Blue - default
+  "var(--chart-2)", // Teal
+  "var(--chart-3)", // Green
+  "var(--chart-4)", // Orange
+  "var(--chart-5)", // Purple
 ];
 
 export type ColumnDraft = {
@@ -55,6 +54,14 @@ type Props = {
     color: string;
     columns: ColumnDraft[];
   };
+  relationships?: Array<{
+    id: string;
+    sourceTableId: string;
+    targetTableId: string;
+    sourceTableName: string;
+    targetTableName: string;
+    type: string;
+  }>;
   onSave: (data: {
     name: string;
     color: string;
@@ -63,7 +70,7 @@ type Props = {
   onClose: () => void;
 };
 
-export function ColumnEditor({ table, onSave, onClose }: Props) {
+export function ColumnEditor({ table, relationships = [], onSave, onClose }: Props) {
   const [name, setName] = useState(table.name);
   const [color, setColor] = useState(table.color);
   const [columns, setColumns] = useState<ColumnDraft[]>(
@@ -83,6 +90,36 @@ export function ColumnEditor({ table, onSave, onClose }: Props) {
         ],
   );
   const [saving, setSaving] = useState(false);
+
+  // Helper to check if a column is a FK
+  const getFKInfo = (columnName: string) => {
+    // Check if this table is the target (has the FK)
+    // For one-to-one, one-to-many, and many-to-one relationships
+    const asTarget = relationships.find(
+      rel => {
+        // For one-to-many and one-to-one: target table has FK
+        if ((rel.type === 'one-to-many' || rel.type === 'one-to-one') && rel.targetTableId === table.id) {
+          const expectedFKName = `${rel.sourceTableName}_id`;
+          return columnName === expectedFKName;
+        }
+        // For many-to-one: source table has FK
+        if (rel.type === 'many-to-one' && rel.sourceTableId === table.id) {
+          const expectedFKName = `${rel.targetTableName}_id`;
+          return columnName === expectedFKName;
+        }
+        return false;
+      }
+    );
+
+    if (asTarget) {
+      const referencedTable = asTarget.type === 'many-to-one'
+        ? asTarget.targetTableName
+        : asTarget.sourceTableName;
+      return { isFK: true, referencesTable: referencedTable, direction: 'references' };
+    }
+
+    return { isFK: false, referencesTable: null, direction: null };
+  };
 
   const addColumn = () => {
     setColumns((prev) => [
@@ -204,7 +241,9 @@ export function ColumnEditor({ table, onSave, onClose }: Props) {
           </div>
 
           <div className="space-y-2">
-            {columns.map((col, idx) => (
+            {columns.map((col, idx) => {
+              const fkInfo = getFKInfo(col.name);
+              return (
               <div
                 key={col.id}
                 className="rounded-xl border overflow-hidden"
@@ -222,6 +261,19 @@ export function ColumnEditor({ table, onSave, onClose }: Props) {
                     placeholder="column_name"
                     className="flex-1 h-7 text-sm border-0 bg-transparent px-0 focus-visible:ring-0"
                   />
+                  {fkInfo.isFK && fkInfo.direction === 'references' && (
+                    <span
+                      className="text-[9px] px-2 py-0.5 rounded-full font-bold"
+                      style={{
+                        background: "rgba(96, 165, 250, 0.15)",
+                        color: "#60a5fa",
+                        border: "1px solid rgba(96, 165, 250, 0.3)",
+                      }}
+                      title={`References ${fkInfo.referencesTable}`}
+                    >
+                      FK → {fkInfo.referencesTable}
+                    </span>
+                  )}
                   <Button
                     onClick={() => removeColumn(col.id)}
                     variant="ghost"
@@ -298,7 +350,8 @@ export function ColumnEditor({ table, onSave, onClose }: Props) {
                   />
                 </div>
               </div>
-            ))}
+            );
+            })}
           </div>
         </div>
       </div>

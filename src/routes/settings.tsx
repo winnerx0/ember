@@ -2,9 +2,17 @@ import { createFileRoute, Link } from "@tanstack/react-router";
 import { useState, useEffect } from "react";
 import { supabase } from "~/lib/supabase";
 import { ThemeToggle } from "~/components/ThemeToggle";
+import { Spinner } from "~/components/ui/spinner";
+import { redirect } from "@tanstack/react-router";
 
 export const Route = createFileRoute("/settings")({
   component: SettingsPage,
+  beforeLoad: async () => {
+    const { data: { session } } = await supabase.auth.getSession();
+    if (!session) {
+      throw redirect({ to: "/auth" });
+    }
+  },
 });
 
 export default function SettingsPage() {
@@ -28,7 +36,7 @@ export default function SettingsPage() {
   if (loading) {
     return (
       <div className="min-h-screen flex items-center justify-center" style={{ background: "var(--background)" }}>
-        <div className="text-sm" style={{ color: "var(--muted-foreground)" }}>Loading...</div>
+        <Spinner size="lg" />
       </div>
     );
   }

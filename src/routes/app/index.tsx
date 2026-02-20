@@ -1,5 +1,5 @@
 import { createFileRoute, Link } from "@tanstack/react-router";
-import { useState, useEffect } from "react";
+import { useState } from "react";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { getProjects, createProject, deleteProject } from "~/server/projects";
 import { ThemeToggle } from "~/components/ThemeToggle";
@@ -8,11 +8,20 @@ import { Input } from "~/components/ui/input";
 import { Textarea } from "~/components/ui/textarea";
 import { Label } from "~/components/ui/label";
 import { ConfirmModal } from "~/components/ui/confirm-modal";
+import { Spinner } from "~/components/ui/spinner";
 import { supabase } from "~/lib/supabase";
+import { toast } from "sonner";
+import { redirect } from "@tanstack/react-router";
 import type { User } from "@supabase/supabase-js";
 
 export const Route = createFileRoute("/app/")({
   component: AppDashboard,
+  beforeLoad: async ({ context }) => {
+    const { data: { session } } = await supabase.auth.getSession();
+    if (!session) {
+      throw redirect({ to: "/auth" });
+    }
+  },
 });
 
 function ProjectCard({
@@ -26,7 +35,7 @@ function ProjectCard({
     tableCount: number;
     updatedAt: Date;
   };
-  onDelete: (id: string) => void;
+  onDelete: (id: string, name: string) => void;
 }) {
   const timeAgo = (date: Date) => {
     const d = new Date(date);
@@ -61,11 +70,11 @@ function ProjectCard({
         >
           {project.name[0].toUpperCase()}
         </div>
-        <button
+        <Button
           onClick={(e) => {
             e.preventDefault();
             e.stopPropagation();
-            onDelete(project.id);
+            onDelete(project.id, project.name);
           }}
           className="opacity-0 group-hover:opacity-100 p-1.5 rounded-lg transition-all"
           style={{
@@ -89,7 +98,7 @@ function ProjectCard({
             <path d="M19 6v14c0 1-1 2-2 2H7c-1 0-2-1-2-2V6" />
             <path d="M8 6V4c0-1 1-2 2-2h4c1 0 2 1 2 2v2" />
           </svg>
-        </button>
+        </Button>
       </div>
 
       <h3 className="font-bold text-base mb-1 transition-colors" style={{ color: "var(--card-foreground)" }}>
@@ -123,12 +132,12 @@ function NewProjectModal({
   user,
 }: {
   onClose: () => void;
-  user: User | null;
+  user: User | null | undefined
 }) {
   const queryClient = useQueryClient();
   const [name, setName] = useState("");
   const [description, setDescription] = useState("");
-  const [loading, setLoading] = useState(false);
+
 
   const createMutation = useMutation({
     mutationFn: createProject,
@@ -138,6 +147,11 @@ function NewProjectModal({
         return [{ ...project, tableCount: 0 }, ...old];
       });
       onClose();
+      toast.success("Project created successfully");
+    },
+    onError: (error) => {
+      console.error("Failed to create project:", error);
+      toast.error("Failed to create project. Please try again.");
     },
   });
 
@@ -145,20 +159,17 @@ function NewProjectModal({
     e.preventDefault();
     if (!name.trim()) return;
 
-    setLoading(true);
     try {
+      console.log("user", user?.id)
       await createMutation.mutateAsync({
         data: {
           name: name.trim(),
           description: description.trim() || undefined,
-          user_id: user?.id
+          user_id: user?.id!
         },
       });
     } catch (error) {
-      console.error("Failed to create project:", error);
-      alert("Failed to create project. Please check the console for details.");
-    } finally {
-      setLoading(false);
+      // Error is handled by mutation onError
     }
   };
 
@@ -183,7 +194,7 @@ function NewProjectModal({
               onChange={(e) => setName(e.target.value)}
               placeholder="e.g. blog_schema, ecommerce_db"
               autoFocus
-            />
+              />
           </div>
           <div className="space-y-2">
             <Label htmlFor="description">Description</Label>
@@ -206,10 +217,17 @@ function NewProjectModal({
             </Button>
             <Button
               type="submit"
-              disabled={!name.trim() || loading || createMutation.isPending}
+              disabled={!name.trim() || createMutation.isPending}
               className="flex-1"
             >
-              {createMutation.isPending ? "Creating..." : "Create Project"}
+              {createMutation.isPending ? (
+                <span className="flex items-center gap-2">
+                  <Spinner size="sm" />
+                  Creating...
+                </span>
+              ) : (
+                "Create Project"
+              )}
             </Button>
           </div>
         </form>
@@ -221,29 +239,27 @@ function NewProjectModal({
 export default function AppDashboard() {
   const queryClient = useQueryClient();
   const [showModal, setShowModal] = useState(false);
-  const [currentUser, setCurrentUser] = useState<User | null>(null);
   const [deleteConfirm, setDeleteConfirm] = useState<{
     isOpen: boolean;
     projectId: string | null;
     projectName: string;
   }>({ isOpen: false, projectId: null, projectName: "" });
 
-  // Get user on mount
-  useEffect(() => {
-    const getUser = async () => {
-      const { data: { user } } = await supabase.auth.getUser();
-      setCurrentUser(user);
-    };
-    getUser();
-  }, []);
-
-  // React Query for projects
   const { data: projects = [], isLoading } = useQuery({
     queryKey: ["projects"],
     queryFn: () => getProjects(),
   });
 
-  // Delete mutation
+    const { data: user } = useQuery({
+      queryKey: ["user"],
+      queryFn: async () => {
+        const { data: { user } } = await supabase.auth.getUser();
+        return user;
+      },
+    })
+
+    console.log("user", user)
+
   const deleteMutation = useMutation({
     mutationFn: deleteProject,
     onSuccess: (_, variables) => {
@@ -252,6 +268,11 @@ export default function AppDashboard() {
         return old.filter((p) => p.id !== variables.data.id);
       });
       setDeleteConfirm({ isOpen: false, projectId: null, projectName: "" });
+      toast.success("Project deleted successfully");
+    },
+    onError: (error) => {
+      console.error("Failed to delete project:", error);
+      toast.error("Failed to delete project. Please try again.");
     },
   });
 
@@ -268,7 +289,7 @@ export default function AppDashboard() {
   if (isLoading) {
     return (
       <div className="min-h-screen flex items-center justify-center" style={{ background: "var(--background)" }}>
-        <div className="text-sm" style={{ color: "var(--muted-foreground)" }}>Loading projects...</div>
+        <Spinner size="lg" />
       </div>
     );
   }
@@ -363,12 +384,7 @@ export default function AppDashboard() {
         )}
       </main>
 
-      {showModal && (
-        <NewProjectModal
-          onClose={() => setShowModal(false)}
-          user={currentUser}
-        />
-      )}
+      {showModal && <NewProjectModal onClose={() => setShowModal(false)} user={user} />}
 
       {/* Delete confirmation modal */}
       <ConfirmModal

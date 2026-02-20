@@ -27,6 +27,7 @@
     "postgres": "^3.4.5",
     "react": "^19.0.0",
     "react-dom": "^19.0.0",
+    "sonner": "^2.0.7",
     "sql-formatter": "^15.4.9",
     "tailwind-merge": "^3.4.1",
     "vite-tsconfig-paths": "^6.1.1",

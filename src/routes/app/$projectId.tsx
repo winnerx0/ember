@@ -19,6 +19,7 @@ import {
 import "@xyflow/react/dist/style.css";
 import { useCallback, useState, useRef, useEffect } from "react";
 import { nanoid } from "nanoid";
+import { redirect } from "@tanstack/react-router";
 import { getProject } from "~/server/projects";
 import {
   addTable,
@@ -39,9 +40,16 @@ import { ExportModal } from "~/components/erd/ExportModal";
 import { ThemeToggle } from "~/components/ThemeToggle";
 import { ConfirmModal } from "~/components/ui/confirm-modal";
 import { supabase } from "~/lib/supabase";
+import { toast } from "sonner";
 
 export const Route = createFileRoute("/app/$projectId")({
   loader: ({ params }) => getProject({ data: { id: params.projectId } }),
+  beforeLoad: async () => {
+    const { data: { session } } = await supabase.auth.getSession();
+    if (!session) {
+      throw redirect({ to: "/auth" });
+    }
+  },
   component: () => (
     <ReactFlowProvider>
       <ERDCanvas />
@@ -53,12 +61,11 @@ const nodeTypes = { tableNode: TableNode };
 const edgeTypes = { relationship: RelationshipEdge };
 
 const TABLE_COLORS = [
-  "var(--chart-1)",
-  "var(--chart-2)",
-  "var(--chart-3)",
-  "var(--chart-4)",
-  "var(--chart-5)",
-  "var(--primary)",
+  "var(--chart-1)", // Blue - default
+  "var(--chart-2)", // Teal
+  "var(--chart-3)", // Green
+  "var(--chart-4)", // Orange
+  "var(--chart-5)", // Purple
 ];
 
 function ERDCanvas() {
@@ -138,6 +145,324 @@ function ERDCanvas() {
   useEffect(() => {
     setTimeout(() => fitView({ padding: 0.2, duration: 500 }), 100);
   }, []);
+
+  // Realtime subscription for relationships
+  useEffect(() => {
+    const channel = supabase
+      .channel(`erd_relationships:${projectId}`)
+      .on(
+        "postgres_changes",
+        {
+          event: "INSERT",
+          schema: "public",
+          table: "erd_relationships",
+          filter: `source_table_id=in.(${nodes.map(n => n.id).join(",")})`,
+        },
+        (payload) => {
+          console.log("Relationship inserted:", payload);
+          const newRel = payload.new as any;
+
+          // Check if this edge already exists
+          const edgeExists = edges.some(e => e.id === newRel.id);
+          if (edgeExists) return;
+
+          const newEdge: Edge = {
+            id: newRel.id,
+            source: newRel.source_table_id,
+            target: newRel.target_table_id,
+            sourceHandle: `${newRel.source_table_id}-table-source`,
+            targetHandle: `${newRel.target_table_id}-table-target`,
+            type: "relationship",
+            data: {
+              type: newRel.type as "one-to-one" | "one-to-many" | "many-to-one" | "many-to-many",
+              label: newRel.label,
+              projectId,
+            },
+          };
+
+          setEdges((eds) => [...eds, newEdge]);
+
+          // Note: FK columns will be synced via the columns realtime subscription
+          toast.info("Relationship added by collaborator");
+        }
+      )
+      .on(
+        "postgres_changes",
+        {
+          event: "UPDATE",
+          schema: "public",
+          table: "erd_relationships",
+          filter: `source_table_id=in.(${nodes.map(n => n.id).join(",")})`,
+        },
+        (payload) => {
+          console.log("Relationship updated:", payload);
+          const updatedRel = payload.new as any;
+
+          setEdges((eds) =>
+            eds.map((e) =>
+              e.id === updatedRel.id
+                ? {
+                    ...e,
+                    data: {
+                      ...e.data,
+                      type: updatedRel.type as "one-to-one" | "one-to-many" | "many-to-one" | "many-to-many",
+                      label: updatedRel.label,
+                    },
+                  }
+                : e
+            )
+          );
+          toast.info("Relationship updated by collaborator");
+        }
+      )
+      .on(
+        "postgres_changes",
+        {
+          event: "DELETE",
+          schema: "public",
+          table: "erd_relationships",
+        },
+        (payload) => {
+          console.log("Relationship deleted:", payload);
+          const deletedRel = payload.old as any;
+
+          setEdges((eds) => eds.filter((e) => e.id !== deletedRel.id));
+          toast.info("Relationship removed by collaborator");
+        }
+      )
+      .subscribe();
+
+    return () => {
+      supabase.removeChannel(channel);
+    };
+  }, [projectId, nodes, edges, setEdges]);
+
+  // Realtime subscription for tables
+  useEffect(() => {
+    const channel = supabase
+      .channel(`erd_tables:${projectId}`)
+      .on(
+        "postgres_changes",
+        {
+          event: "INSERT",
+          schema: "public",
+          table: "erd_tables",
+          filter: `project_id=eq.${projectId}`,
+        },
+        (payload) => {
+          console.log("Table inserted:", payload);
+          const newTable = payload.new as any;
+
+          // Check if this node already exists
+          const nodeExists = nodes.some(n => n.id === newTable.id);
+          if (nodeExists) return;
+
+          const newNode: Node = {
+            id: newTable.id,
+            type: "tableNode",
+            position: { x: newTable.position_x, y: newTable.position_y },
+            data: {
+              id: newTable.id,
+              name: newTable.name,
+              color: newTable.color,
+              projectId,
+              columns: [],
+            } as TableNodeData,
+          };
+
+          setNodes((nds) => [...nds, newNode]);
+          toast.info(`Table "${newTable.name}" added by collaborator`);
+        }
+      )
+      .on(
+        "postgres_changes",
+        {
+          event: "UPDATE",
+          schema: "public",
+          table: "erd_tables",
+          filter: `project_id=eq.${projectId}`,
+        },
+        (payload) => {
+          console.log("Table updated:", payload);
+          const updatedTable = payload.new as any;
+
+          setNodes((nds) =>
+            nds.map((n) =>
+              n.id === updatedTable.id
+                ? {
+                    ...n,
+                    position: {
+                      x: updatedTable.position_x,
+                      y: updatedTable.position_y,
+                    },
+                    data: {
+                      ...n.data,
+                      name: updatedTable.name,
+                      color: updatedTable.color,
+                    },
+                  }
+                : n
+            )
+          );
+          toast.info(`Table "${updatedTable.name}" updated by collaborator`);
+        }
+      )
+      .on(
+        "postgres_changes",
+        {
+          event: "DELETE",
+          schema: "public",
+          table: "erd_tables",
+        },
+        (payload) => {
+          console.log("Table deleted:", payload);
+          const deletedTable = payload.old as any;
+
+          setNodes((nds) => nds.filter((n) => n.id !== deletedTable.id));
+          toast.info(`Table "${deletedTable.name}" removed by collaborator`);
+        }
+      )
+      .subscribe();
+
+    return () => {
+      supabase.removeChannel(channel);
+    };
+  }, [projectId, nodes, setNodes]);
+
+  // Realtime subscription for columns
+  useEffect(() => {
+    const channel = supabase
+      .channel(`erd_columns:${projectId}`)
+      .on(
+        "postgres_changes",
+        {
+          event: "INSERT",
+          schema: "public",
+          table: "erd_columns",
+        },
+        (payload) => {
+          console.log("Column inserted:", payload);
+          const newColumn = payload.new as any;
+
+          // Update the node with the new column
+          setNodes((nds) =>
+            nds.map((n) => {
+              if (n.id === newColumn.table_id) {
+                const tableData = n.data as TableNodeData;
+                // Check if column already exists
+                const columnExists = tableData.columns?.some(c => c.id === newColumn.id);
+                if (columnExists) return n;
+
+                const updatedColumns = [
+                  ...(tableData.columns || []),
+                  {
+                    id: newColumn.id,
+                    name: newColumn.name,
+                    type: newColumn.type,
+                    nullable: newColumn.nullable,
+                    isPrimary: newColumn.is_primary,
+                    isUnique: newColumn.is_unique,
+                    defaultValue: newColumn.default_value,
+                    order: newColumn.order,
+                  },
+                ].sort((a, b) => a.order - b.order);
+
+                return {
+                  ...n,
+                  data: {
+                    ...n.data,
+                    columns: updatedColumns,
+                  },
+                };
+              }
+              return n;
+            })
+          );
+        }
+      )
+      .on(
+        "postgres_changes",
+        {
+          event: "UPDATE",
+          schema: "public",
+          table: "erd_columns",
+        },
+        (payload) => {
+          console.log("Column updated:", payload);
+          const updatedColumn = payload.new as any;
+
+          setNodes((nds) =>
+            nds.map((n) => {
+              if (n.id === updatedColumn.table_id) {
+                const tableData = n.data as TableNodeData;
+                const updatedColumns = (tableData.columns || []).map((c) =>
+                  c.id === updatedColumn.id
+                    ? {
+                        id: updatedColumn.id,
+                        name: updatedColumn.name,
+                        type: updatedColumn.type,
+                        nullable: updatedColumn.nullable,
+                        isPrimary: updatedColumn.is_primary,
+                        isUnique: updatedColumn.is_unique,
+                        defaultValue: updatedColumn.default_value,
+                        order: updatedColumn.order,
+                      }
+                    : c
+                ).sort((a, b) => a.order - b.order);
+
+                return {
+                  ...n,
+                  data: {
+                    ...n.data,
+                    columns: updatedColumns,
+                  },
+                };
+              }
+              return n;
+            })
+          );
+        }
+      )
+      .on(
+        "postgres_changes",
+        {
+          event: "DELETE",
+          schema: "public",
+          table: "erd_columns",
+        },
+        (payload) => {
+          console.log("Column deleted:", payload);
+          const deletedColumn = payload.old as any;
+
+          setNodes((nds) =>
+            nds.map((n) => {
+              const tableData = n.data as TableNodeData;
+              const hasColumn = tableData.columns?.some(c => c.id === deletedColumn.id);
+
+              if (hasColumn) {
+                const updatedColumns = (tableData.columns || []).filter(
+                  (c) => c.id !== deletedColumn.id
+                );
+
+                return {
+                  ...n,
+                  data: {
+                    ...n.data,
+                    columns: updatedColumns,
+                  },
+                };
+              }
+              return n;
+            })
+          );
+        }
+      )
+      .subscribe();
+
+    return () => {
+      supabase.removeChannel(channel);
+    };
+  }, [projectId, nodes, setNodes]);
 
   // Debounced position save
   const scheduleSave = useCallback(
@@ -280,10 +605,21 @@ function ERDCanvas() {
       };
       setEdges((eds) => addEdge(newEdge, eds));
 
+      // Get the source PK column and target FK column IDs
+      const sourcePK = sourceTableData.columns?.find((col) => col.isPrimary);
+      const targetFK = updatedTargetColumns.find((col) => col.name === fkColumnName);
+
+      if (!sourcePK || !targetFK) {
+        console.error("Missing source PK or target FK column");
+        return;
+      }
+
       await addRelationship({
         data: {
           sourceTableId: connection.source,
           targetTableId: connection.target,
+          sourceColumnId: sourcePK.id,
+          targetColumnId: targetFK.id,
           type: "one-to-many",
         },
       });
@@ -373,14 +709,9 @@ function ERDCanvas() {
       const oldType = (edge.data as any)?.type || "one-to-many";
 
       // Determine which table currently has the FK column and which should have it
-      // "many" side holds the FK. For one-to-one, FK stays on target.
-      const oldFKSide = oldType === "many-to-one" ? "source" : "target";
-      const newFKSide =
-        newType === "many-to-one"
-          ? "source"
-          : newType === "many-to-many"
-            ? "none"
-            : "target"; // one-to-one and one-to-many both put FK on target
+      // "many" side holds the FK. For one-to-one and one-to-many, FK is on target.
+      const oldFKSide = oldType === "many-to-one" ? "source" : oldType === "many-to-many" ? "none" : "target";
+      const newFKSide = newType === "many-to-one" ? "source" : newType === "many-to-many" ? "none" : "target";
 
       // Update the edge type
       setEdges((eds) =>
@@ -389,142 +720,112 @@ function ERDCanvas() {
         ),
       );
 
-      // Move the FK column if needed
-      if (oldFKSide !== newFKSide && edge.source && edge.target) {
+      // Handle FK column changes
+      if (edge.source && edge.target) {
         const sourceNode = nodes.find((n) => n.id === edge.source);
         const targetNode = nodes.find((n) => n.id === edge.target);
+
         if (sourceNode && targetNode) {
           const sourceData = sourceNode.data as TableNodeData;
           const targetData = targetNode.data as TableNodeData;
+          const sourcePK = sourceData.columns?.find((col) => col.isPrimary);
+          const targetPK = targetData.columns?.find((col) => col.isPrimary);
 
-          // FK column name depends on which table is the "one" (parent/owner) side
-          // The FK references the parent's PK
-          const oldParentData =
-            oldFKSide === "target" ? sourceData : targetData;
-          const oldFKName = `${oldParentData.name}_id`;
+          // FK column names
+          const sourceFKName = `${sourceData.name}_id`;
+          const targetFKName = `${targetData.name}_id`;
 
-          // Remove FK from the old table
-          const oldFKTable = oldFKSide === "target" ? edge.target : edge.source;
-          const oldFKTableData =
-            oldFKSide === "target" ? targetData : sourceData;
-          const columnsWithoutFK = (oldFKTableData.columns || []).filter(
-            (col) => col.name !== oldFKName,
-          );
-
-          // If we need to add FK to a new table (not "none" for many-to-many)
-          if (newFKSide !== "none") {
-            const newFKTable =
-              newFKSide === "target" ? edge.target : edge.source;
-            const newParentData =
-              newFKSide === "target" ? sourceData : targetData;
-            const newFKTableData =
-              newFKSide === "target" ? targetData : sourceData;
-            const newFKName = `${newParentData.name}_id`;
-
-            // Check if FK already exists in the new table
-            const newTableColumns =
-              newFKTable === oldFKTable
-                ? columnsWithoutFK
-                : newFKTableData.columns || [];
-            const fkAlreadyExists = newTableColumns.some(
-              (col) => col.name === newFKName,
+          // Remove old FK if it exists
+          if (oldFKSide === "source") {
+            // Remove FK from source table
+            const columnsWithoutFK = (sourceData.columns || []).filter(
+              (col) => col.name !== targetFKName,
             );
-
-            let updatedNewColumns = [...newTableColumns];
-            if (!fkAlreadyExists) {
-              const parentPK = newParentData.columns?.find(
-                (col) => col.isPrimary,
-              );
-              updatedNewColumns.push({
-                id: nanoid(),
-                name: newFKName,
-                type: parentPK?.type || "uuid",
-                isPrimary: false,
-                isUnique: false,
-                nullable: false,
-                defaultValue: null,
-                order: updatedNewColumns.length,
-              });
-            }
-
-            // Update nodes
-            setNodes((nds) =>
-              nds.map((n) => {
-                if (n.id === oldFKTable && oldFKTable !== newFKTable) {
-                  // Remove FK from old table
-                  return {
-                    ...n,
-                    data: { ...n.data, columns: [...columnsWithoutFK] },
-                  };
-                }
-                if (n.id === newFKTable) {
-                  // Add FK to new table (or update if same table)
-                  return {
-                    ...n,
-                    data: { ...n.data, columns: [...updatedNewColumns] },
-                  };
-                }
-                return n;
-              }),
-            );
-
-            // Persist changes
-            try {
-              if (oldFKTable !== newFKTable) {
-                await saveColumns({
-                  data: {
-                    tableId: oldFKTable,
-                    projectId,
-                    columns: columnsWithoutFK.map((c, i) => ({
-                      id: c.id,
-                      name: c.name,
-                      type: c.type,
-                      nullable: c.nullable,
-                      isPrimary: c.isPrimary,
-                      isUnique: c.isUnique,
-                      defaultValue: c.defaultValue || undefined,
-                      order: i,
-                    })),
-                  },
-                });
-              }
-              await saveColumns({
-                data: {
-                  tableId: newFKTable,
-                  projectId,
-                  columns: updatedNewColumns.map((c, i) => ({
-                    id: c.id,
-                    name: c.name,
-                    type: c.type,
-                    nullable: c.nullable,
-                    isPrimary: c.isPrimary,
-                    isUnique: c.isUnique,
-                    defaultValue: c.defaultValue || undefined,
-                    order: i,
-                  })),
-                },
-              });
-            } catch (error) {
-              console.error("Failed to move FK column:", error);
-            }
-          } else {
-            // many-to-many: just remove the FK from the old table
             setNodes((nds) =>
               nds.map((n) =>
-                n.id === oldFKTable
-                  ? {
-                      ...n,
-                      data: { ...n.data, columns: [...columnsWithoutFK] },
-                    }
+                n.id === edge.source
+                  ? { ...n, data: { ...n.data, columns: [...columnsWithoutFK] } }
                   : n,
               ),
             );
-            try {
+            await saveColumns({
+              data: {
+                tableId: edge.source,
+                projectId,
+                columns: columnsWithoutFK.map((c, i) => ({
+                  id: c.id,
+                  name: c.name,
+                  type: c.type,
+                  nullable: c.nullable,
+                  isPrimary: c.isPrimary,
+                  isUnique: c.isUnique,
+                  defaultValue: c.defaultValue || undefined,
+                  order: i,
+                })),
+              },
+            });
+          } else if (oldFKSide === "target") {
+            // Remove FK from target table
+            const columnsWithoutFK = (targetData.columns || []).filter(
+              (col) => col.name !== sourceFKName,
+            );
+            setNodes((nds) =>
+              nds.map((n) =>
+                n.id === edge.target
+                  ? { ...n, data: { ...n.data, columns: [...columnsWithoutFK] } }
+                  : n,
+              ),
+            );
+            await saveColumns({
+              data: {
+                tableId: edge.target,
+                projectId,
+                columns: columnsWithoutFK.map((c, i) => ({
+                  id: c.id,
+                  name: c.name,
+                  type: c.type,
+                  nullable: c.nullable,
+                  isPrimary: c.isPrimary,
+                  isUnique: c.isUnique,
+                  defaultValue: c.defaultValue || undefined,
+                  order: i,
+                })),
+              },
+            });
+          }
+
+          // Add new FK if needed
+          if (newFKSide === "source") {
+            // Add FK to source table
+            const fkExists = (sourceData.columns || []).some(
+              (col) => col.name === targetFKName,
+            );
+            if (!fkExists) {
+              const updatedColumns = [
+                ...(sourceData.columns || []).filter((col) => col.name !== targetFKName),
+                {
+                  id: nanoid(),
+                  name: targetFKName,
+                  type: targetPK?.type || "uuid",
+                  isPrimary: false,
+                  isUnique: false,
+                  nullable: false,
+                  defaultValue: null,
+                  order: (sourceData.columns || []).length,
+                },
+              ];
+              setNodes((nds) =>
+                nds.map((n) =>
+                  n.id === edge.source
+                    ? { ...n, data: { ...n.data, columns: [...updatedColumns] } }
+                    : n,
+                ),
+              );
               await saveColumns({
                 data: {
-                  tableId: oldFKTable,
+                  tableId: edge.source,
                   projectId,
-                  columns: columnsWithoutFK.map((c, i) => ({
+                  columns: updatedColumns.map((c, i) => ({
                     id: c.id,
                     name: c.name,
                     type: c.type,
@@ -536,8 +837,49 @@ function ERDCanvas() {
                   })),
                 },
               });
-            } catch (error) {
-              console.error("Failed to remove FK column:", error);
+            }
+          } else if (newFKSide === "target") {
+            // Add FK to target table
+            const fkExists = (targetData.columns || []).some(
+              (col) => col.name === sourceFKName,
+            );
+            if (!fkExists) {
+              const updatedColumns = [
+                ...(targetData.columns || []).filter((col) => col.name !== sourceFKName),
+                {
+                  id: nanoid(),
+                  name: sourceFKName,
+                  type: sourcePK?.type || "uuid",
+                  isPrimary: false,
+                  isUnique: false,
+                  nullable: false,
+                  defaultValue: null,
+                  order: (targetData.columns || []).length,
+                },
+              ];
+              setNodes((nds) =>
+                nds.map((n) =>
+                  n.id === edge.target
+                    ? { ...n, data: { ...n.data, columns: [...updatedColumns] } }
+                    : n,
+                ),
+              );
+              await saveColumns({
+                data: {
+                  tableId: edge.target,
+                  projectId,
+                  columns: updatedColumns.map((c, i) => ({
+                    id: c.id,
+                    name: c.name,
+                    type: c.type,
+                    nullable: c.nullable,
+                    isPrimary: c.isPrimary,
+                    isUnique: c.isUnique,
+                    defaultValue: c.defaultValue || undefined,
+                    order: i,
+                  })),
+                },
+              });
             }
           }
         }
@@ -1200,6 +1542,18 @@ function ERDCanvas() {
             color: selectedTableData.color,
             columns: (selectedTableData.columns || []) as ColumnDraft[],
           }}
+          relationships={edges.map(edge => {
+            const sourceNode = nodes.find(n => n.id === edge.source);
+            const targetNode = nodes.find(n => n.id === edge.target);
+            return {
+              id: edge.id,
+              sourceTableId: edge.source,
+              targetTableId: edge.target,
+              sourceTableName: (sourceNode?.data as TableNodeData)?.name || '',
+              targetTableName: (targetNode?.data as TableNodeData)?.name || '',
+              type: (edge.data as any)?.type || 'one-to-many',
+            };
+          })}
           onSave={handleSaveTable}
           onClose={() => setSelectedTableId(null)}
         />

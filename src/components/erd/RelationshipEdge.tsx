@@ -39,6 +39,24 @@ function getFKSides(type: string): {
   }
 }
 
+/**
+ * Get the unit direction vector pointing away from the node for a given handle position.
+ */
+function getHandleDirection(position: string): { dx: number; dy: number } {
+  switch (position) {
+    case "right":
+      return { dx: 1, dy: 0 };
+    case "left":
+      return { dx: -1, dy: 0 };
+    case "bottom":
+      return { dx: 0, dy: 1 };
+    case "top":
+      return { dx: 0, dy: -1 };
+    default:
+      return { dx: 1, dy: 0 };
+  }
+}
+
 const TYPE_LABELS: Record<string, string> = {
   "one-to-one": "1 : 1",
   "one-to-many": "1 : N",
@@ -82,19 +100,15 @@ function CardinalityMarker({
 
   if (isMany) {
     // Crow's foot: three prongs fanning out from (cx, cy) backwards
-    // Center prong — straight back
     const backX = cx - dx * DEPTH;
     const backY = cy - dy * DEPTH;
-    // Top prong
     const topX = backX + px * SPREAD;
     const topY = backY + py * SPREAD;
-    // Bottom prong
     const botX = backX - px * SPREAD;
     const botY = backY - py * SPREAD;
 
     return (
       <g>
-        {/* Three prongs of the crow's foot */}
         <line
           x1={cx}
           y1={cy}
@@ -177,42 +191,15 @@ export const RelationshipEdge = memo(
       targetPosition,
     });
 
-    const sourceIsMany = type === "many-to-one" || type === "many-to-many";
-    const targetIsMany = type === "one-to-many" || type === "many-to-many";
-
-    // Unit vector from source to target
-    const dxRaw = targetX - sourceX;
-    const dyRaw = targetY - sourceY;
-    const len = Math.sqrt(dxRaw * dxRaw + dyRaw * dyRaw) || 1;
-    const ux = dxRaw / len; // unit vector source→target
-    const uy = dyRaw / len;
-
-    // Marker offset from the node handle
-    const MARKER_DIST = 18;
-
-    // Perpendicular direction for label offset (so FK label floats beside the line)
-    const perpX = -uy;
-    const perpY = ux;
-    const PERP_OFFSET = 16; // pixels perpendicular to edge
-
-    // Source marker: sits a bit away from source, pointing towards target
-    const srcMkX = sourceX + ux * MARKER_DIST;
-    const srcMkY = sourceY + uy * MARKER_DIST;
-
-    // Target marker: sits a bit away from target, pointing towards source
-    const tgtMkX = targetX - ux * MARKER_DIST;
-    const tgtMkY = targetY - uy * MARKER_DIST;
-
-    // FK labels positioned close to the node handle, offset perpendicular to the edge
-    const FK_ALONG_DIST = 28; // along the edge from the handle
-    const srcLblX = sourceX + ux * FK_ALONG_DIST + perpX * PERP_OFFSET;
-    const srcLblY = sourceY + uy * FK_ALONG_DIST + perpY * PERP_OFFSET;
-    const tgtLblX = targetX - ux * FK_ALONG_DIST + perpX * PERP_OFFSET;
-    const tgtLblY = targetY - uy * FK_ALONG_DIST + perpY * PERP_OFFSET;
-
     const edgeColor = selected ? "var(--primary)" : "var(--muted-foreground)";
     const strokeW = selected ? 2 : 1.5;
     const edgeOpacity = selected ? 1 : 0.55;
+
+    const MARKER_OFFSET = 12; // px away from the node before drawing the marker
+    const sourceDir = getHandleDirection(sourcePosition);
+    const targetDir = getHandleDirection(targetPosition);
+    const sourceIsMany = type === "many-to-one" || type === "many-to-many";
+    const targetIsMany = type === "one-to-many" || type === "many-to-many";
 
     const handleTypeChange = (
       newType: "one-to-one" | "one-to-many" | "many-to-one" | "many-to-many",
@@ -236,31 +223,25 @@ export const RelationshipEdge = memo(
           }}
         />
 
-        {/* Source-side cardinality marker */}
-        <g opacity={edgeOpacity}>
-          <CardinalityMarker
-            cx={srcMkX}
-            cy={srcMkY}
-            dx={ux}
-            dy={uy}
-            isMany={sourceIsMany}
-            color={edgeColor}
-            sw={strokeW}
-          />
-        </g>
-
-        {/* Target-side cardinality marker */}
-        <g opacity={edgeOpacity}>
-          <CardinalityMarker
-            cx={tgtMkX}
-            cy={tgtMkY}
-            dx={-ux}
-            dy={-uy}
-            isMany={targetIsMany}
-            color={edgeColor}
-            sw={strokeW}
-          />
-        </g>
+        {/* Cardinality markers rendered in SVG space */}
+        <CardinalityMarker
+          cx={sourceX + sourceDir.dx * MARKER_OFFSET}
+          cy={sourceY + sourceDir.dy * MARKER_OFFSET}
+          dx={sourceDir.dx}
+          dy={sourceDir.dy}
+          isMany={sourceIsMany}
+          color={edgeColor}
+          sw={strokeW}
+        />
+        <CardinalityMarker
+          cx={targetX + targetDir.dx * MARKER_OFFSET}
+          cy={targetY + targetDir.dy * MARKER_OFFSET}
+          dx={targetDir.dx}
+          dy={targetDir.dy}
+          isMany={targetIsMany}
+          color={edgeColor}
+          sw={strokeW}
+        />
 
         <EdgeLabelRenderer>
           {/* Center label — type badge + controls */}
@@ -371,54 +352,6 @@ export const RelationshipEdge = memo(
               )}
             </div>
           </div>
-
-          {/* Source-side FK label — visible when FK is on source side */}
-          {fkSides.source && (
-            <div
-              style={{
-                position: "absolute",
-                transform: `translate(-50%, -50%) translate(${srcLblX}px,${srcLblY}px)`,
-                pointerEvents: "none",
-                zIndex: 10,
-              }}
-            >
-              <span
-                className="text-[9px] font-extrabold px-2 py-0.5 rounded-md tracking-wider shadow-sm"
-                style={{
-                  color: "#60a5fa",
-                  background: "rgba(96, 165, 250, 0.15)",
-                  border: "1px solid rgba(96, 165, 250, 0.3)",
-                  boxShadow: "0 1px 4px rgba(96, 165, 250, 0.15)",
-                }}
-              >
-                FK
-              </span>
-            </div>
-          )}
-
-          {/* Target-side FK label — visible when FK is on target side */}
-          {fkSides.target && (
-            <div
-              style={{
-                position: "absolute",
-                transform: `translate(-50%, -50%) translate(${tgtLblX}px,${tgtLblY}px)`,
-                pointerEvents: "none",
-                zIndex: 10,
-              }}
-            >
-              <span
-                className="text-[9px] font-extrabold px-2 py-0.5 rounded-md tracking-wider shadow-sm"
-                style={{
-                  color: "#60a5fa",
-                  background: "rgba(96, 165, 250, 0.15)",
-                  border: "1px solid rgba(96, 165, 250, 0.3)",
-                  boxShadow: "0 1px 4px rgba(96, 165, 250, 0.15)",
-                }}
-              >
-                FK
-              </span>
-            </div>
-          )}
 
           {/* Junction table hint for M:N */}
           {fkSides.junction && selected && (

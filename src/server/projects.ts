@@ -52,7 +52,7 @@ export const createProject = createServerFn({ method: "POST" })
     const id = nanoid();
     const [project] = await db
       .insert(projects)
-      .values({ id, name: data.name, description: data.description, user_id: data.user_id })
+      .values({ id, name: data.name, description: data.description, userId: data.user_id })
       .returning();
     await invalidateCache(CACHE_KEYS.projects());
     return project;
