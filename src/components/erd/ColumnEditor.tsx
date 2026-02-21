@@ -1,5 +1,4 @@
 import { useState } from "react";
-import { nanoid } from "nanoid";
 import { Button } from "~/components/ui/button";
 import { Input } from "~/components/ui/input";
 import { Label } from "~/components/ui/label";
@@ -78,7 +77,7 @@ export function ColumnEditor({ table, relationships = [], onSave, onClose }: Pro
       ? table.columns
       : [
           {
-            id: nanoid(),
+            id: crypto.randomUUID(),
             name: "id",
             type: "uuid",
             isPrimary: true,
@@ -125,7 +124,7 @@ export function ColumnEditor({ table, relationships = [], onSave, onClose }: Pro
     setColumns((prev) => [
       ...prev,
       {
-        id: nanoid(),
+        id: crypto.randomUUID(),
         name: "",
         type: "text",
         isPrimary: false,
@@ -167,7 +166,12 @@ export function ColumnEditor({ table, relationships = [], onSave, onClose }: Pro
         color,
         columns: columns.map((c, i) => ({ ...c, order: i })),
       });
+
+      // Close the editor after successful save
       onClose();
+    } catch (error) {
+      console.error('Failed to save:', error);
+      // Don't close on error so user can retry
     } finally {
       setSaving(false);
     }
@@ -294,7 +298,9 @@ export function ColumnEditor({ table, relationships = [], onSave, onClose }: Pro
                     <SelectTrigger>
                       <SelectValue />
                     </SelectTrigger>
-                    <SelectContent>
+                    <SelectContent
+                      className="max-h-[300px] overflow-y-auto"
+                    >
                       {PG_TYPES.map((t) => (
                         <SelectItem key={t} value={t}>
                           {t}

@@ -76,12 +76,11 @@ export const TableNode = memo(({ data, selected }: NodeProps) => {
     >
       {/* Table header */}
       <div
-        className="flex items-center gap-2 px-3 py-2.5 cursor-pointer"
+        className="flex items-center gap-2 px-3 py-2.5"
         style={{
           background: `linear-gradient(135deg, ${color}20, ${color}08)`,
           borderBottom: `1px solid ${color}25`,
         }}
-        onClick={() => onSelect?.(nodeData.id)}
       >
         <div
           className="w-2.5 h-2.5 rounded-full flex-shrink-0"
@@ -93,40 +92,13 @@ export const TableNode = memo(({ data, selected }: NodeProps) => {
         >
           {name}
         </span>
-        <div className="flex items-center gap-1 opacity-0 group-hover:opacity-100">
-          {(hovered || selected) && (
-            <>
-              <button
-                className="p-1 rounded transition-all text-xs"
-                style={{ color: "var(--muted-foreground)" }}
-                onClick={(e) => {
-                  e.stopPropagation();
-                  onSelect?.(nodeData.id);
-                }}
-                title="Edit table"
-              >
-                ✎
-              </button>
-              <button
-                className="p-1 rounded text-red-400 hover:bg-red-500/10 transition-all text-xs"
-                onClick={(e) => {
-                  e.stopPropagation();
-                  onDelete?.(nodeData.id);
-                }}
-                title="Delete table"
-              >
-                ✕
-              </button>
-            </>
-          )}
-        </div>
       </div>
 
       {/* Columns */}
       <div>
         {columns.length === 0 ? (
           <div className="px-3 py-3 text-xs italic text-center" style={{ color: "var(--muted-foreground)" }}>
-            No columns — click to add
+            No columns yet
           </div>
         ) : (
           columns.map((col, idx) => {

@@ -1,154 +1,180 @@
 import { createServerFn } from "@tanstack/react-start";
-import { db } from "~/db";
-import { projects, erdTables, erdColumns, erdRelationships } from "~/db/schema";
-import { eq, desc, inArray, or } from "drizzle-orm";
-import { nanoid } from "nanoid";
 import { z } from "zod";
-import { getCache, setCache, invalidateCache, CACHE_KEYS } from "~/lib/redis";
-
-export type ProjectWithStats = {
-  id: string;
-  name: string;
-  description: string | null;
-  createdAt: Date;
-  updatedAt: Date;
-  tableCount: number;
-};
+import { createSupabaseServerClient } from "~/lib/supabase";
 
 export const getProjects = createServerFn({ method: "GET" }).handler(
-  async () => {
-    const cached = await getCache<ProjectWithStats[]>(CACHE_KEYS.projects());
-    if (cached) return cached;
+  async ({ request }) => {
+    const supabase = createSupabaseServerClient(request);
 
-    const rows = await db
-      .select()
-      .from(projects)
-      .orderBy(desc(projects.updatedAt));
+    // Verify user is authenticated
+    const { data: { user }, error: authError } = await supabase.auth.getUser();
+    if (authError || !user) {
+      throw new Error("Unauthorized");
+    }
 
-    const result: ProjectWithStats[] = await Promise.all(
-      rows.map(async (p) => {
-        const tables = await db
-          .select()
-          .from(erdTables)
-          .where(eq(erdTables.projectId, p.id));
-        return { ...p, tableCount: tables.length };
-      }),
-    );
+    const { data: projects, error } = await supabase
+      .from("erd_projects")
+      .select(
+        `
+        id,
+        name,
+        description,
+        updated_at,
+        erd_tables (count)
+      `
+      )
+      .order("updated_at", { ascending: false });
 
-    await setCache(CACHE_KEYS.projects(), result, 60);
-    return result;
-  },
+    if (error) throw error;
+
+    return projects.map((p: any) => ({
+      id: p.id,
+      name: p.name,
+      description: p.description,
+      updatedAt: new Date(p.updated_at),
+      tableCount: p.erd_tables[0]?.count || 0,
+    }));
+  }
 );
+
+export const getProject = createServerFn({ method: "GET" })
+  .inputValidator(z.object({ id: z.string() }))
+  .handler(async ({ data, request }) => {
+    const supabase = createSupabaseServerClient(request);
+
+    // Verify user is authenticated
+    const { data: { user }, error: authError } = await supabase.auth.getUser();
+    if (authError || !user) {
+      throw new Error("Unauthorized");
+    }
+
+    const { data: project, error: projectError } = await supabase
+      .from("erd_projects")
+      .select("*")
+      .eq("id", data.id)
+      .single();
+
+    if (projectError) throw projectError;
+
+    const { data: tables, error: tablesError } = await supabase
+      .from("erd_tables")
+      .select(
+        `
+        *,
+        erd_columns (*)
+      `
+      )
+      .eq("project_id", data.id)
+      .order("created_at", { ascending: true });
+
+    if (tablesError) throw tablesError;
+
+    const { data: relationships, error: relationshipsError } = await supabase
+      .from("erd_relationships")
+      .select("*")
+      .in(
+        "source_table_id",
+        tables.map((t: any) => t.id)
+      );
+
+    if (relationshipsError) throw relationshipsError;
+
+    return {
+      name: project.name,
+      description: project.description,
+      tables: tables.map((t: any) => ({
+        id: t.id,
+        name: t.name,
+        color: t.color,
+        positionX: t.position_x,
+        positionY: t.position_y,
+        columns: (t.erd_columns || [])
+          .map((c: any) => ({
+            id: c.id,
+            name: c.name,
+            type: c.type,
+            nullable: c.nullable,
+            isPrimary: c.is_primary,
+            isUnique: c.is_unique,
+            defaultValue: c.default_value,
+            order: c.order,
+          }))
+          .sort((a: any, b: any) => a.order - b.order),
+      })),
+      relationships: (relationships || []).map((r: any) => ({
+        id: r.id,
+        sourceTableId: r.source_table_id,
+        targetTableId: r.target_table_id,
+        sourceColumnId: r.source_column_id,
+        targetColumnId: r.target_column_id,
+        type: r.type,
+        label: r.label,
+      })),
+    };
+  });
 
 export const createProject = createServerFn({ method: "POST" })
   .inputValidator(
     z.object({
-      name: z.string().min(1).max(100),
+      name: z.string(),
       description: z.string().optional(),
-      user_id: z.string(),
-    }),
+    })
   )
-  .handler(async ({ data }) => {
-    const id = nanoid();
-    const [project] = await db
-      .insert(projects)
-      .values({ id, name: data.name, description: data.description, userId: data.user_id })
-      .returning();
-    await invalidateCache(CACHE_KEYS.projects());
+  .handler(async ({ data, request }) => {
+    const supabase = createSupabaseServerClient(request);
+
+    // Debug: Log cookies
+    console.log('=== CREATE PROJECT DEBUG ===');
+    console.log('Cookie header:', request.headers.get('Cookie'));
+
+    // Get authenticated user
+    const { data: { user }, error: authError } = await supabase.auth.getUser();
+    console.log('User:', user);
+    console.log('Auth error:', authError);
+
+    if (authError || !user) {
+      console.error('Authentication failed:', authError);
+      throw new Error("Unauthorized - please sign in again");
+    }
+
+    console.log('Creating project for user:', user.id);
+
+    const { data: project, error } = await supabase
+      .from("erd_projects")
+      .insert({
+        name: data.name,
+        description: data.description,
+        user_id: user.id,
+      })
+      .select()
+      .single();
+
+    if (error) {
+      console.error('Database error:', error);
+      throw error;
+    }
+
+    console.log('Project created:', project);
     return project;
-  });
-
-export const getProject = createServerFn({ method: "GET" })
-  .inputValidator(z.object({ id: z.string() }))
-  .handler(async ({ data }) => {
-    const cached = await getCache(CACHE_KEYS.project(data.id));
-    if (cached) return cached;
-
-    const [project] = await db
-      .select()
-      .from(projects)
-      .where(eq(projects.id, data.id));
-    if (!project) throw new Error("Project not found");
-
-    const tables = await db
-      .select()
-      .from(erdTables)
-      .where(eq(erdTables.projectId, data.id));
-
-    const columns = tables.length
-      ? await db
-          .select()
-          .from(erdColumns)
-          .where(eq(erdColumns.tableId, tables.map((t) => t.id)[0]))
-      : [];
-
-    // Fetch all columns for all tables
-    const allColumns =
-      tables.length > 0
-        ? await Promise.all(
-            tables.map((t) =>
-              db
-                .select()
-                .from(erdColumns)
-                .where(eq(erdColumns.tableId, t.id))
-                .then((cols) => cols.sort((a, b) => a.order - b.order)),
-            ),
-          )
-        : [];
-
-    // Get relationships through tables (normalized schema)
-    const relationshipTableIds = tables.map((t) => t.id);
-    const relationships =
-      relationshipTableIds.length > 0
-        ? await db
-            .select()
-            .from(erdRelationships)
-            .where(
-              or(
-                inArray(erdRelationships.sourceTableId, relationshipTableIds),
-                inArray(erdRelationships.targetTableId, relationshipTableIds),
-              ),
-            )
-        : [];
-
-    const result = {
-      ...project,
-      tables: tables.map((t, i) => ({ ...t, columns: allColumns[i] || [] })),
-      relationships,
-    };
-
-    await setCache(CACHE_KEYS.project(data.id), result, 120);
-    return result;
   });
 
 export const deleteProject = createServerFn({ method: "POST" })
   .inputValidator(z.object({ id: z.string() }))
-  .handler(async ({ data }) => {
-    await db.delete(projects).where(eq(projects.id, data.id));
-    await invalidateCache(CACHE_KEYS.projects());
-    await invalidateCache(CACHE_KEYS.project(data.id));
-    return { success: true };
-  });
+  .handler(async ({ data, request }) => {
+    const supabase = createSupabaseServerClient(request);
 
-export const updateProject = createServerFn({ method: "POST" })
-  .inputValidator(
-    z.object({
-      id: z.string(),
-      name: z.string().min(1).max(100),
-      description: z.string().optional(),
-    }),
-  )
-  .handler(async ({ data }) => {
-    const [updated] = await db
-      .update(projects)
-      .set({
-        name: data.name,
-        description: data.description,
-        updatedAt: new Date(),
-      })
-      .where(eq(projects.id, data.id))
-      .returning();
-    await invalidateCache(CACHE_KEYS.projects());
-    await invalidateCache(CACHE_KEYS.project(data.id));
-    return updated;
+    // Verify user is authenticated
+    const { data: { user }, error: authError } = await supabase.auth.getUser();
+    if (authError || !user) {
+      throw new Error("Unauthorized");
+    }
+
+    const { error } = await supabase
+      .from("erd_projects")
+      .delete()
+      .eq("id", data.id);
+
+    if (error) throw error;
+
+    return { success: true };
   });

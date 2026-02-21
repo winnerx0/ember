@@ -1,10 +1,6 @@
 import { createServerFn } from "@tanstack/react-start";
-import { db } from "~/db";
-import { erdRelationships } from "~/db/schema";
-import { eq } from "drizzle-orm";
-import { nanoid } from "nanoid";
 import { z } from "zod";
-import { invalidateCache, CACHE_KEYS } from "~/lib/redis";
+import { createSupabaseServerClient } from "~/lib/supabase";
 
 export const addRelationship = createServerFn({ method: "POST" })
   .inputValidator(
@@ -13,35 +9,33 @@ export const addRelationship = createServerFn({ method: "POST" })
       targetTableId: z.string(),
       sourceColumnId: z.string(),
       targetColumnId: z.string(),
-      type: z
-        .enum(["one-to-one", "one-to-many", "many-to-one", "many-to-many"])
-        .default("one-to-many"),
-      label: z.string().optional(),
-    }),
+      type: z.enum(["one-to-one", "one-to-many", "many-to-one", "many-to-many"]),
+    })
   )
-  .handler(async ({ data }) => {
-    const id = nanoid();
-    const [rel] = await db
-      .insert(erdRelationships)
-      .values({ id, ...data })
-      .returning();
-    // Get projectId from sourceTable for cache invalidation
-    const { erdTables } = await import("~/db/schema");
-    const sourceTable = await db.query.erdTables.findFirst({
-      where: eq(erdTables.id, data.sourceTableId),
-    });
-    if (sourceTable) {
-      await invalidateCache(CACHE_KEYS.project(sourceTable.projectId));
-    }
-    return rel;
-  });
+  .handler(async ({ data, request }) => {
+    const supabase = createSupabaseServerClient(request);
 
-export const deleteRelationship = createServerFn({ method: "POST" })
-  .inputValidator(z.object({ id: z.string(), projectId: z.string() }))
-  .handler(async ({ data }) => {
-    await db.delete(erdRelationships).where(eq(erdRelationships.id, data.id));
-    await invalidateCache(CACHE_KEYS.project(data.projectId));
-    return { success: true };
+    // Verify user is authenticated
+    const { data: { user }, error: authError } = await supabase.auth.getUser();
+    if (authError || !user) {
+      throw new Error("Unauthorized");
+    }
+
+    const { data: relationship, error } = await supabase
+      .from("erd_relationships")
+      .insert({
+        source_table_id: data.sourceTableId,
+        target_table_id: data.targetTableId,
+        source_column_id: data.sourceColumnId,
+        target_column_id: data.targetColumnId,
+        type: data.type,
+      })
+      .select()
+      .single();
+
+    if (error) throw error;
+
+    return relationship;
   });
 
 export const updateRelationship = createServerFn({ method: "POST" })
@@ -49,17 +43,58 @@ export const updateRelationship = createServerFn({ method: "POST" })
     z.object({
       id: z.string(),
       projectId: z.string(),
-      type: z.enum(["one-to-one", "one-to-many", "many-to-one", "many-to-many"]).optional(),
+      type: z.enum(["one-to-one", "one-to-many", "many-to-one", "many-to-many"]),
       label: z.string().optional(),
-    }),
+      sourceColumnId: z.string().optional(),
+      targetColumnId: z.string().optional(),
+    })
   )
-  .handler(async ({ data }) => {
-    const { id, projectId, ...rest } = data;
-    const [updated] = await db
-      .update(erdRelationships)
-      .set(rest)
-      .where(eq(erdRelationships.id, id))
-      .returning();
-    await invalidateCache(CACHE_KEYS.project(projectId));
-    return updated;
+  .handler(async ({ data, request }) => {
+    const supabase = createSupabaseServerClient(request);
+
+    // Verify user is authenticated
+    const { data: { user }, error: authError } = await supabase.auth.getUser();
+    if (authError || !user) {
+      throw new Error("Unauthorized");
+    }
+
+    const updates: any = { type: data.type };
+    if (data.label !== undefined) updates.label = data.label;
+    if (data.sourceColumnId !== undefined) updates.source_column_id = data.sourceColumnId;
+    if (data.targetColumnId !== undefined) updates.target_column_id = data.targetColumnId;
+
+    const { error } = await supabase
+      .from("erd_relationships")
+      .update(updates)
+      .eq("id", data.id);
+
+    if (error) throw error;
+
+    return { success: true };
+  });
+
+export const deleteRelationship = createServerFn({ method: "POST" })
+  .inputValidator(
+    z.object({
+      id: z.string(),
+      projectId: z.string(),
+    })
+  )
+  .handler(async ({ data, request }) => {
+    const supabase = createSupabaseServerClient(request);
+
+    // Verify user is authenticated
+    const { data: { user }, error: authError } = await supabase.auth.getUser();
+    if (authError || !user) {
+      throw new Error("Unauthorized");
+    }
+
+    const { error } = await supabase
+      .from("erd_relationships")
+      .delete()
+      .eq("id", data.id);
+
+    if (error) throw error;
+
+    return { success: true };
   });

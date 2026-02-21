@@ -9,6 +9,7 @@ type Props = {
 };
 
 function highlightSQL(sql: string): string {
+  if (!sql) return '';
   return sql
     .replace(
       /\b(CREATE|TABLE|IF|NOT|EXISTS|ALTER|ADD|CONSTRAINT|FOREIGN|KEY|REFERENCES|PRIMARY|UNIQUE|DEFAULT|INDEX|ON)\b/g,
@@ -50,7 +51,9 @@ export function ExportModal({ projectId, projectName, onClose }: Props) {
     const a = document.createElement("a");
     a.href = url;
     a.download = `${projectName.replace(/\s+/g, "_").toLowerCase()}.sql`;
+    document.body.appendChild(a);
     a.click();
+    document.body.removeChild(a);
     URL.revokeObjectURL(url);
   };
 

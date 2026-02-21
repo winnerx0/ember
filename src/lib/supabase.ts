@@ -1,5 +1,5 @@
-import { createClient } from "@supabase/supabase-js";
-import { createServerClient, parseCookieHeader, serializeCookieHeader } from "@supabase/ssr";
+import { createBrowserClient } from "@supabase/ssr";
+import { createServerClient } from "@supabase/ssr";
 
 const supabaseUrl = import.meta.env.VITE_SUPABASE_URL;
 const supabasePublishablenKey = import.meta.env.VITE_SUPABASE_PUBLISHABLE_KEY;
@@ -10,30 +10,38 @@ if (!supabaseUrl || !supabasePublishablenKey) {
   );
 }
 
-// Client-side Supabase client (browser only)
-export const supabase = createClient(supabaseUrl, supabasePublishablenKey, {
-  auth: {
-    persistSession: true,
-    detectSessionInUrl: true,
-    flowType: 'pkce',
-    storage: typeof window !== 'undefined' ? window.localStorage : undefined,
-  },
-});
+// Client-side Supabase client (browser only) - uses cookies for SSR compatibility
+export const supabase = typeof window !== 'undefined'
+  ? createBrowserClient(supabaseUrl, supabasePublishablenKey)
+  : null as any;
 
 // Server-side Supabase client factory
 export function createSupabaseServerClient(request: Request) {
-  const headers = new Headers();
-  const cookies = parseCookieHeader(request.headers.get('Cookie') ?? '');
-
   return createServerClient(supabaseUrl, supabasePublishablenKey, {
     cookies: {
       getAll() {
+        const cookieHeader = request.headers.get('Cookie') ?? '';
+        console.log('Raw cookie header:', cookieHeader);
+
+        const cookies = cookieHeader
+          .split(';')
+          .map(cookie => cookie.trim())
+          .filter(cookie => cookie.length > 0)
+          .map(cookie => {
+            const [name, ...valueParts] = cookie.split('=');
+            return {
+              name: name.trim(),
+              value: decodeURIComponent(valueParts.join('='))
+            };
+          });
+
+        console.log('Parsed cookies:', cookies.map(c => c.name));
         return cookies;
       },
       setAll(cookiesToSet) {
-        cookiesToSet.forEach(({ name, value, options }) => {
-          headers.append('Set-Cookie', serializeCookieHeader(name, value, options));
-        });
+        // Note: In TanStack Start, we can't set response headers here
+        // Cookies will be set by the browser client automatically
+        console.log('Attempting to set cookies:', cookiesToSet.map(c => c.name));
       },
     },
   });

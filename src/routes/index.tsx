@@ -354,26 +354,6 @@ export default function LandingPage() {
               BETA
             </span>
           </div>
-          <div
-            className="hidden md:flex items-center gap-6 lg:gap-8 text-sm"
-            style={{ color: "var(--muted-foreground)" }}
-          >
-            <a href="#features" className="hover:opacity-80 transition-colors">
-              Features
-            </a>
-            <a
-              href="#how-it-works"
-              className="hover:opacity-80 transition-colors"
-            >
-              How it works
-            </a>
-            <a
-              href="https://github.com"
-              className="hover:opacity-80 transition-colors"
-            >
-              GitHub
-            </a>
-          </div>
           <div className="flex items-center gap-2 sm:gap-3">
             <ThemeToggle />
             {user ? (

@@ -92,22 +92,43 @@ SelectValue.displayName = "SelectValue";
 
 const SelectContent = React.forwardRef<
   HTMLDivElement,
-  React.HTMLAttributes<HTMLDivElement>
->(({ className, children, ...props }, ref) => {
+  React.HTMLAttributes<HTMLDivElement> & {
+    position?: "popper" | "item-aligned";
+    side?: "top" | "bottom" | "left" | "right";
+    align?: "start" | "center" | "end";
+    sideOffset?: number;
+  }
+>(({ className, children, position = "popper", side = "bottom", sideOffset = 4, ...props }, ref) => {
   const { open, setOpen, triggerRef } = useSelectContext();
   const contentRef = React.useRef<HTMLDivElement>(null);
-  const [position, setPosition] = React.useState({ top: 0, left: 0, width: 0 });
+  const [pos, setPos] = React.useState({ top: 0, left: 0, width: 0 });
 
   React.useEffect(() => {
     if (open && triggerRef.current) {
       const rect = triggerRef.current.getBoundingClientRect();
-      setPosition({
-        top: rect.bottom + window.scrollY,
-        left: rect.left + window.scrollX,
+      const scrollY = window.scrollY;
+      const scrollX = window.scrollX;
+
+      let top = rect.bottom + scrollY + sideOffset;
+      let left = rect.left + scrollX;
+
+      // Check if dropdown would go off bottom of screen
+      const dropdownHeight = 300; // max-height
+      const spaceBelow = window.innerHeight - rect.bottom;
+      const spaceAbove = rect.top;
+
+      if (spaceBelow < dropdownHeight && spaceAbove > spaceBelow) {
+        // Show above if more space
+        top = rect.top + scrollY - dropdownHeight - sideOffset;
+      }
+
+      setPos({
+        top,
+        left,
         width: rect.width,
       });
     }
-  }, [open, triggerRef]);
+  }, [open, triggerRef, sideOffset]);
 
   React.useEffect(() => {
     const handleClickOutside = (event: MouseEvent) => {
@@ -136,13 +157,13 @@ const SelectContent = React.forwardRef<
     <div
       ref={contentRef}
       className={cn(
-        "fixed z-50 mt-1 max-h-[300px] overflow-auto rounded-md border bg-popover text-popover-foreground shadow-md",
+        "fixed z-[100] mt-1 max-h-[300px] overflow-auto rounded-md border bg-popover text-popover-foreground shadow-md",
         className
       )}
       style={{
-        top: `${position.top}px`,
-        left: `${position.left}px`,
-        width: `${position.width}px`,
+        top: `${pos.top}px`,
+        left: `${pos.left}px`,
+        width: `${pos.width}px`,
       }}
       {...props}
     >

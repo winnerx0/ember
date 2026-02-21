@@ -18,7 +18,6 @@ import {
 } from "@xyflow/react";
 import "@xyflow/react/dist/style.css";
 import { useCallback, useState, useRef, useEffect } from "react";
-import { nanoid } from "nanoid";
 import { getProject } from "~/server/projects";
 import {
   addTable,
@@ -63,7 +62,12 @@ const TABLE_COLORS = [
 ];
 
 function ERDCanvas() {
-  const project: { name: string; description: string; tables: any[]; relationships: any[] } = Route.useLoaderData();
+  const project: {
+    name: string;
+    description: string;
+    tables: any[];
+    relationships: any[];
+  } = Route.useLoaderData();
   const { projectId } = Route.useParams();
   const { fitView } = useReactFlow();
 
@@ -71,24 +75,25 @@ function ERDCanvas() {
   const lsKey = `ember-${projectId}`;
 
   // Build initial nodes from project data or localStorage
-  const savedNodes = typeof window !== "undefined"
-    ? localStorage.getItem(`${lsKey}-nodes`)
-    : null;
+  const savedNodes =
+    typeof window !== "undefined"
+      ? localStorage.getItem(`${lsKey}-nodes`)
+      : null;
 
   const initialNodes: Node[] = savedNodes
     ? JSON.parse(savedNodes)
     : project.tables.map((table: any) => ({
-    id: table.id,
-    type: "tableNode",
-    position: { x: table.positionX, y: table.positionY },
-    data: {
-      id: table.id,
-      name: table.name,
-      color: table.color,
-      projectId,
-      columns: table.columns || [],
-    } as TableNodeData,
-  }));
+        id: table.id,
+        type: "tableNode",
+        position: { x: table.positionX, y: table.positionY },
+        data: {
+          id: table.id,
+          name: table.name,
+          color: table.color,
+          projectId,
+          columns: table.columns || [],
+        } as TableNodeData,
+      }));
 
   const initialEdges: Edge[] = project.relationships.map((rel: any) => ({
     id: rel.id,
@@ -124,7 +129,9 @@ function ERDCanvas() {
   // Get user on mount and clear auth hash
   useEffect(() => {
     const getUser = async () => {
-      const { data: { user } } = await supabase.auth.getUser();
+      const {
+        data: { user },
+      } = await supabase.auth.getUser();
       setUser(user);
 
       // Clear OAuth hash from URL after session is established
@@ -150,14 +157,13 @@ function ERDCanvas() {
           event: "INSERT",
           schema: "public",
           table: "erd_relationships",
-          filter: `source_table_id=in.(${nodes.map(n => n.id).join(",")})`,
+          filter: `source_table_id=in.(${nodes.map((n) => n.id).join(",")})`,
         },
         (payload) => {
-          console.log("Relationship inserted:", payload);
           const newRel = payload.new as any;
 
           // Check if this edge already exists
-          const edgeExists = edges.some(e => e.id === newRel.id);
+          const edgeExists = edges.some((e) => e.id === newRel.id);
           if (edgeExists) return;
 
           const newEdge: Edge = {
@@ -168,7 +174,11 @@ function ERDCanvas() {
             targetHandle: `${newRel.target_table_id}-table-target`,
             type: "relationship",
             data: {
-              type: newRel.type as "one-to-one" | "one-to-many" | "many-to-one" | "many-to-many",
+              type: newRel.type as
+                | "one-to-one"
+                | "one-to-many"
+                | "many-to-one"
+                | "many-to-many",
               label: newRel.label,
               projectId,
             },
@@ -178,7 +188,7 @@ function ERDCanvas() {
 
           // Note: FK columns will be synced via the columns realtime subscription
           toast.info("Relationship added by collaborator");
-        }
+        },
       )
       .on(
         "postgres_changes",
@@ -186,10 +196,9 @@ function ERDCanvas() {
           event: "UPDATE",
           schema: "public",
           table: "erd_relationships",
-          filter: `source_table_id=in.(${nodes.map(n => n.id).join(",")})`,
+          filter: `source_table_id=in.(${nodes.map((n) => n.id).join(",")})`,
         },
         (payload) => {
-          console.log("Relationship updated:", payload);
           const updatedRel = payload.new as any;
 
           setEdges((eds) =>
@@ -199,15 +208,19 @@ function ERDCanvas() {
                     ...e,
                     data: {
                       ...e.data,
-                      type: updatedRel.type as "one-to-one" | "one-to-many" | "many-to-one" | "many-to-many",
+                      type: updatedRel.type as
+                        | "one-to-one"
+                        | "one-to-many"
+                        | "many-to-one"
+                        | "many-to-many",
                       label: updatedRel.label,
                     },
                   }
-                : e
-            )
+                : e,
+            ),
           );
           toast.info("Relationship updated by collaborator");
-        }
+        },
       )
       .on(
         "postgres_changes",
@@ -217,12 +230,11 @@ function ERDCanvas() {
           table: "erd_relationships",
         },
         (payload) => {
-          console.log("Relationship deleted:", payload);
           const deletedRel = payload.old as any;
 
           setEdges((eds) => eds.filter((e) => e.id !== deletedRel.id));
           toast.info("Relationship removed by collaborator");
-        }
+        },
       )
       .subscribe();
 
@@ -244,11 +256,10 @@ function ERDCanvas() {
           filter: `project_id=eq.${projectId}`,
         },
         (payload) => {
-          console.log("Table inserted:", payload);
           const newTable = payload.new as any;
 
           // Check if this node already exists
-          const nodeExists = nodes.some(n => n.id === newTable.id);
+          const nodeExists = nodes.some((n) => n.id === newTable.id);
           if (nodeExists) return;
 
           const newNode: Node = {
@@ -266,7 +277,7 @@ function ERDCanvas() {
 
           setNodes((nds) => [...nds, newNode]);
           toast.info(`Table "${newTable.name}" added by collaborator`);
-        }
+        },
       )
       .on(
         "postgres_changes",
@@ -277,7 +288,6 @@ function ERDCanvas() {
           filter: `project_id=eq.${projectId}`,
         },
         (payload) => {
-          console.log("Table updated:", payload);
           const updatedTable = payload.new as any;
 
           setNodes((nds) =>
@@ -295,11 +305,11 @@ function ERDCanvas() {
                       color: updatedTable.color,
                     },
                   }
-                : n
-            )
+                : n,
+            ),
           );
           toast.info(`Table "${updatedTable.name}" updated by collaborator`);
-        }
+        },
       )
       .on(
         "postgres_changes",
@@ -309,12 +319,11 @@ function ERDCanvas() {
           table: "erd_tables",
         },
         (payload) => {
-          console.log("Table deleted:", payload);
           const deletedTable = payload.old as any;
 
           setNodes((nds) => nds.filter((n) => n.id !== deletedTable.id));
           toast.info(`Table "${deletedTable.name}" removed by collaborator`);
-        }
+        },
       )
       .subscribe();
 
@@ -335,7 +344,6 @@ function ERDCanvas() {
           table: "erd_columns",
         },
         (payload) => {
-          console.log("Column inserted:", payload);
           const newColumn = payload.new as any;
 
           // Update the node with the new column
@@ -344,7 +352,9 @@ function ERDCanvas() {
               if (n.id === newColumn.table_id) {
                 const tableData = n.data as TableNodeData;
                 // Check if column already exists
-                const columnExists = tableData.columns?.some(c => c.id === newColumn.id);
+                const columnExists = tableData.columns?.some(
+                  (c) => c.id === newColumn.id,
+                );
                 if (columnExists) return n;
 
                 const updatedColumns = [
@@ -370,9 +380,9 @@ function ERDCanvas() {
                 };
               }
               return n;
-            })
+            }),
           );
-        }
+        },
       )
       .on(
         "postgres_changes",
@@ -382,27 +392,28 @@ function ERDCanvas() {
           table: "erd_columns",
         },
         (payload) => {
-          console.log("Column updated:", payload);
           const updatedColumn = payload.new as any;
 
           setNodes((nds) =>
             nds.map((n) => {
               if (n.id === updatedColumn.table_id) {
                 const tableData = n.data as TableNodeData;
-                const updatedColumns = (tableData.columns || []).map((c) =>
-                  c.id === updatedColumn.id
-                    ? {
-                        id: updatedColumn.id,
-                        name: updatedColumn.name,
-                        type: updatedColumn.type,
-                        nullable: updatedColumn.nullable,
-                        isPrimary: updatedColumn.is_primary,
-                        isUnique: updatedColumn.is_unique,
-                        defaultValue: updatedColumn.default_value,
-                        order: updatedColumn.order,
-                      }
-                    : c
-                ).sort((a, b) => a.order - b.order);
+                const updatedColumns = (tableData.columns || [])
+                  .map((c) =>
+                    c.id === updatedColumn.id
+                      ? {
+                          id: updatedColumn.id,
+                          name: updatedColumn.name,
+                          type: updatedColumn.type,
+                          nullable: updatedColumn.nullable,
+                          isPrimary: updatedColumn.is_primary,
+                          isUnique: updatedColumn.is_unique,
+                          defaultValue: updatedColumn.default_value,
+                          order: updatedColumn.order,
+                        }
+                      : c,
+                  )
+                  .sort((a, b) => a.order - b.order);
 
                 return {
                   ...n,
@@ -413,9 +424,9 @@ function ERDCanvas() {
                 };
               }
               return n;
-            })
+            }),
           );
-        }
+        },
       )
       .on(
         "postgres_changes",
@@ -425,17 +436,18 @@ function ERDCanvas() {
           table: "erd_columns",
         },
         (payload) => {
-          console.log("Column deleted:", payload);
           const deletedColumn = payload.old as any;
 
           setNodes((nds) =>
             nds.map((n) => {
               const tableData = n.data as TableNodeData;
-              const hasColumn = tableData.columns?.some(c => c.id === deletedColumn.id);
+              const hasColumn = tableData.columns?.some(
+                (c) => c.id === deletedColumn.id,
+              );
 
               if (hasColumn) {
                 const updatedColumns = (tableData.columns || []).filter(
-                  (c) => c.id !== deletedColumn.id
+                  (c) => c.id !== deletedColumn.id,
                 );
 
                 return {
@@ -447,9 +459,9 @@ function ERDCanvas() {
                 };
               }
               return n;
-            })
+            }),
           );
-        }
+        },
       )
       .subscribe();
 
@@ -506,7 +518,7 @@ function ERDCanvas() {
     async (connection: Connection) => {
       if (!connection.source || !connection.target) return;
 
-      const id = nanoid();
+      const id = crypto.randomUUID();
 
       const sourceNode = nodes.find((n) => n.id === connection.source);
       const targetNode = nodes.find((n) => n.id === connection.target);
@@ -533,7 +545,7 @@ function ERDCanvas() {
         const fkType = sourcePK?.type || "uuid";
 
         const newFkColumn = {
-          id: nanoid(),
+          id: crypto.randomUUID(),
           name: fkColumnName,
           type: fkType,
           isPrimary: false,
@@ -544,13 +556,6 @@ function ERDCanvas() {
         };
 
         updatedTargetColumns = [...updatedTargetColumns, newFkColumn];
-
-        console.log(
-          "Adding FK:",
-          fkColumnName,
-          "to child table",
-          targetTableData.name,
-        );
 
         // Update the TARGET (child) node with the new FK column
         setNodes((nds) =>
@@ -601,7 +606,9 @@ function ERDCanvas() {
 
       // Get the source PK column and target FK column IDs
       const sourcePK = sourceTableData.columns?.find((col) => col.isPrimary);
-      const targetFK = updatedTargetColumns.find((col) => col.name === fkColumnName);
+      const targetFK = updatedTargetColumns.find(
+        (col) => col.name === fkColumnName,
+      );
 
       if (!sourcePK || !targetFK) {
         console.error("Missing source PK or target FK column");
@@ -706,8 +713,18 @@ function ERDCanvas() {
 
       // Determine which table currently has the FK column and which should have it
       // "many" side holds the FK. For one-to-one and one-to-many, FK is on target.
-      const oldFKSide = oldType === "many-to-one" ? "source" : oldType === "many-to-many" ? "none" : "target";
-      const newFKSide = newType === "many-to-one" ? "source" : newType === "many-to-many" ? "none" : "target";
+      const oldFKSide =
+        oldType === "many-to-one"
+          ? "source"
+          : oldType === "many-to-many"
+            ? "none"
+            : "target";
+      const newFKSide =
+        newType === "many-to-one"
+          ? "source"
+          : newType === "many-to-many"
+            ? "none"
+            : "target";
 
       // Update the edge type
       setEdges((eds) =>
@@ -731,8 +748,145 @@ function ERDCanvas() {
           const sourceFKName = `${sourceData.name}_id`;
           const targetFKName = `${targetData.name}_id`;
 
-          // Remove old FK if it exists
-          if (oldFKSide === "source") {
+          // Track the new column IDs for the relationship
+          let newSourceColumnId = sourcePK?.id;
+          let newTargetColumnId: string | undefined;
+
+          // STEP 1: Add new FK column if needed (before removing old one)
+          if (newFKSide === "source") {
+            // Add FK to source table (many-to-one: source references target)
+            const fkExists = (sourceData.columns || []).some(
+              (col) => col.name === targetFKName,
+            );
+            if (!fkExists) {
+              const newFKId = crypto.randomUUID();
+              const updatedColumns = [
+                ...(sourceData.columns || []).filter(
+                  (col) => col.name !== targetFKName,
+                ),
+                {
+                  id: newFKId,
+                  name: targetFKName,
+                  type: targetPK?.type || "uuid",
+                  isPrimary: false,
+                  isUnique: false,
+                  nullable: false,
+                  defaultValue: null,
+                  order: (sourceData.columns || []).length,
+                },
+              ];
+              setNodes((nds) =>
+                nds.map((n) =>
+                  n.id === edge.source
+                    ? {
+                        ...n,
+                        data: { ...n.data, columns: [...updatedColumns] },
+                      }
+                    : n,
+                ),
+              );
+              await saveColumns({
+                data: {
+                  tableId: edge.source,
+                  projectId,
+                  columns: updatedColumns.map((c, i) => ({
+                    id: c.id,
+                    name: c.name,
+                    type: c.type,
+                    nullable: c.nullable,
+                    isPrimary: c.isPrimary,
+                    isUnique: c.isUnique,
+                    defaultValue: c.defaultValue || undefined,
+                    order: i,
+                  })),
+                },
+              });
+              // For many-to-one: source has FK, target has PK
+              newSourceColumnId = newFKId;
+              newTargetColumnId = targetPK?.id;
+            } else {
+              // FK already exists, find its ID
+              const existingFK = (sourceData.columns || []).find(
+                (col) => col.name === targetFKName,
+              );
+              newSourceColumnId = existingFK?.id;
+              newTargetColumnId = targetPK?.id;
+            }
+          } else if (newFKSide === "target") {
+            // Add FK to target table (one-to-many or one-to-one: target references source)
+            const fkExists = (targetData.columns || []).some(
+              (col) => col.name === sourceFKName,
+            );
+            if (!fkExists) {
+              const newFKId = crypto.randomUUID();
+              const updatedColumns = [
+                ...(targetData.columns || []).filter(
+                  (col) => col.name !== sourceFKName,
+                ),
+                {
+                  id: newFKId,
+                  name: sourceFKName,
+                  type: sourcePK?.type || "uuid",
+                  isPrimary: false,
+                  isUnique: false,
+                  nullable: false,
+                  defaultValue: null,
+                  order: (targetData.columns || []).length,
+                },
+              ];
+              setNodes((nds) =>
+                nds.map((n) =>
+                  n.id === edge.target
+                    ? {
+                        ...n,
+                        data: { ...n.data, columns: [...updatedColumns] },
+                      }
+                    : n,
+                ),
+              );
+              await saveColumns({
+                data: {
+                  tableId: edge.target,
+                  projectId,
+                  columns: updatedColumns.map((c, i) => ({
+                    id: c.id,
+                    name: c.name,
+                    type: c.type,
+                    nullable: c.nullable,
+                    isPrimary: c.isPrimary,
+                    isUnique: c.isUnique,
+                    defaultValue: c.defaultValue || undefined,
+                    order: i,
+                  })),
+                },
+              });
+              // For one-to-many/one-to-one: source has PK, target has FK
+              newSourceColumnId = sourcePK?.id;
+              newTargetColumnId = newFKId;
+            } else {
+              // FK already exists, find its ID
+              const existingFK = (targetData.columns || []).find(
+                (col) => col.name === sourceFKName,
+              );
+              newSourceColumnId = sourcePK?.id;
+              newTargetColumnId = existingFK?.id;
+            }
+          }
+
+          // STEP 2: Update the relationship with new column IDs BEFORE deleting old FK
+          // This prevents CASCADE delete from removing the relationship
+          await updateRelationship({
+            data: {
+              id: edgeId,
+              projectId,
+              type: newType,
+              sourceColumnId: newSourceColumnId,
+              targetColumnId: newTargetColumnId,
+            },
+          });
+
+          // STEP 3: Now safe to remove old FK column
+          if (oldFKSide === "source" && newFKSide !== "source") {
             // Remove FK from source table
             const columnsWithoutFK = (sourceData.columns || []).filter(
               (col) => col.name !== targetFKName,
@@ -740,7 +894,10 @@ function ERDCanvas() {
             setNodes((nds) =>
               nds.map((n) =>
                 n.id === edge.source
-                  ? { ...n, data: { ...n.data, columns: [...columnsWithoutFK] } }
+                  ? {
+                      ...n,
+                      data: { ...n.data, columns: [...columnsWithoutFK] },
+                    }
                   : n,
               ),
             );
@@ -760,7 +917,7 @@ function ERDCanvas() {
                 })),
               },
             });
-          } else if (oldFKSide === "target") {
+          } else if (oldFKSide === "target" && newFKSide !== "target") {
             // Remove FK from target table
             const columnsWithoutFK = (targetData.columns || []).filter(
               (col) => col.name !== sourceFKName,
@@ -768,7 +925,10 @@ function ERDCanvas() {
             setNodes((nds) =>
               nds.map((n) =>
                 n.id === edge.target
-                  ? { ...n, data: { ...n.data, columns: [...columnsWithoutFK] } }
+                  ? {
+                      ...n,
+                      data: { ...n.data, columns: [...columnsWithoutFK] },
+                    }
                   : n,
               ),
             );
@@ -789,101 +949,13 @@ function ERDCanvas() {
               },
             });
           }
-
-          // Add new FK if needed
-          if (newFKSide === "source") {
-            // Add FK to source table
-            const fkExists = (sourceData.columns || []).some(
-              (col) => col.name === targetFKName,
-            );
-            if (!fkExists) {
-              const updatedColumns = [
-                ...(sourceData.columns || []).filter((col) => col.name !== targetFKName),
-                {
-                  id: nanoid(),
-                  name: targetFKName,
-                  type: targetPK?.type || "uuid",
-                  isPrimary: false,
-                  isUnique: false,
-                  nullable: false,
-                  defaultValue: null,
-                  order: (sourceData.columns || []).length,
-                },
-              ];
-              setNodes((nds) =>
-                nds.map((n) =>
-                  n.id === edge.source
-                    ? { ...n, data: { ...n.data, columns: [...updatedColumns] } }
-                    : n,
-                ),
-              );
-              await saveColumns({
-                data: {
-                  tableId: edge.source,
-                  projectId,
-                  columns: updatedColumns.map((c, i) => ({
-                    id: c.id,
-                    name: c.name,
-                    type: c.type,
-                    nullable: c.nullable,
-                    isPrimary: c.isPrimary,
-                    isUnique: c.isUnique,
-                    defaultValue: c.defaultValue || undefined,
-                    order: i,
-                  })),
-                },
-              });
-            }
-          } else if (newFKSide === "target") {
-            // Add FK to target table
-            const fkExists = (targetData.columns || []).some(
-              (col) => col.name === sourceFKName,
-            );
-            if (!fkExists) {
-              const updatedColumns = [
-                ...(targetData.columns || []).filter((col) => col.name !== sourceFKName),
-                {
-                  id: nanoid(),
-                  name: sourceFKName,
-                  type: sourcePK?.type || "uuid",
-                  isPrimary: false,
-                  isUnique: false,
-                  nullable: false,
-                  defaultValue: null,
-                  order: (targetData.columns || []).length,
-                },
-              ];
-              setNodes((nds) =>
-                nds.map((n) =>
-                  n.id === edge.target
-                    ? { ...n, data: { ...n.data, columns: [...updatedColumns] } }
-                    : n,
-                ),
-              );
-              await saveColumns({
-                data: {
-                  tableId: edge.target,
-                  projectId,
-                  columns: updatedColumns.map((c, i) => ({
-                    id: c.id,
-                    name: c.name,
-                    type: c.type,
-                    nullable: c.nullable,
-                    isPrimary: c.isPrimary,
-                    isUnique: c.isUnique,
-                    defaultValue: c.defaultValue || undefined,
-                    order: i,
-                  })),
-                },
-              });
-            }
-          }
         }
+      } else {
+        // No column changes needed, just update the type
+        await updateRelationship({
+          data: { id: edgeId, projectId, type: newType },
+        });
       }
-
-      await updateRelationship({
-        data: { id: edgeId, projectId, type: newType },
-      });
     },
     [projectId, setEdges, edges, nodes, setNodes],
   );
@@ -901,7 +973,7 @@ function ERDCanvas() {
   // Add table
   const handleAddTable = async () => {
     if (!newTableName.trim()) return;
-    const id = nanoid();
+    const id = crypto.randomUUID();
     const color = TABLE_COLORS[colorIdx.current % TABLE_COLORS.length];
     colorIdx.current++;
 
@@ -1428,24 +1500,21 @@ function ERDCanvas() {
                     }}
                   >
                     {user && (
-                      <div className="px-3 py-2 border-b text-xs" style={{ borderColor: "var(--border)" }}>
+                      <div
+                        className="px-3 py-2 border-b text-xs"
+                        style={{ borderColor: "var(--border)" }}
+                      >
                         <p className="font-medium truncate max-w-[200px]">
                           {user.user_metadata?.full_name || "User"}
                         </p>
-                        <p className="truncate max-w-[200px]" style={{ color: "var(--muted-foreground)" }}>
+                        <p
+                          className="truncate max-w-[200px]"
+                          style={{ color: "var(--muted-foreground)" }}
+                        >
                           {user.email}
                         </p>
                       </div>
                     )}
-                    <Link
-                      to="/settings"
-                      className="flex items-center gap-2 px-3 py-2 text-xs hover:opacity-80 transition-opacity"
-                      style={{ color: "var(--foreground)" }}
-                      onClick={() => setShowUserMenu(false)}
-                    >
-                      <span>⚙</span>
-                      <span>Settings</span>
-                    </Link>
                     <button
                       onClick={handleSignOut}
                       className="w-full flex items-center gap-2 px-3 py-2 text-xs hover:opacity-80 transition-opacity text-left"
@@ -1538,16 +1607,16 @@ function ERDCanvas() {
             color: selectedTableData.color,
             columns: (selectedTableData.columns || []) as ColumnDraft[],
           }}
-          relationships={edges.map(edge => {
-            const sourceNode = nodes.find(n => n.id === edge.source);
-            const targetNode = nodes.find(n => n.id === edge.target);
+          relationships={edges.map((edge) => {
+            const sourceNode = nodes.find((n) => n.id === edge.source);
+            const targetNode = nodes.find((n) => n.id === edge.target);
             return {
               id: edge.id,
               sourceTableId: edge.source,
               targetTableId: edge.target,
-              sourceTableName: (sourceNode?.data as TableNodeData)?.name || '',
-              targetTableName: (targetNode?.data as TableNodeData)?.name || '',
-              type: (edge.data as any)?.type || 'one-to-many',
+              sourceTableName: (sourceNode?.data as TableNodeData)?.name || "",
+              targetTableName: (targetNode?.data as TableNodeData)?.name || "",
+              type: (edge.data as any)?.type || "one-to-many",
             };
           })}
           onSave={handleSaveTable}

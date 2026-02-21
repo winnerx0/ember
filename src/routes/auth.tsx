@@ -18,19 +18,11 @@ export default function AuthPage() {
     const checkSession = async () => {
       // Check if there's a hash in the URL (OAuth callback)
       if (window.location.hash.includes("access_token")) {
-        // Exchange the hash for a session and set cookies
+        // Exchange the hash for a session
         const { data: { session }, error } = await supabase.auth.getSession();
 
         if (session && !error) {
           setUser(session.user);
-
-          // Set the session in cookies for server-side access
-          await setSessionCookies({
-            data: {
-              access_token: session.access_token,
-              refresh_token: session.refresh_token
-            }
-          });
 
           // Clear the hash and redirect to app
           window.history.replaceState(null, "", "/app");
@@ -53,16 +45,6 @@ export default function AuthPage() {
     // Listen for auth changes
     const { data: { subscription } } = supabase.auth.onAuthStateChange(async (_event, session) => {
       setUser(session?.user || null);
-
-      // Update cookies when auth state changes
-      if (session) {
-        await setSessionCookies({
-          data: {
-            access_token: session.access_token,
-            refresh_token: session.refresh_token
-          }
-        });
-      }
     });
 
     return () => subscription.unsubscribe();
@@ -83,8 +65,6 @@ export default function AuthPage() {
 
   const handleSignOut = async () => {
     await supabase.auth.signOut();
-    // Clear server-side cookies
-    await clearSessionCookies();
     setUser(null);
   };
 
@@ -105,7 +85,7 @@ export default function AuthPage() {
           <Link to="/" className="flex items-center gap-2">
             <div
               className="w-8 h-8 rounded-lg flex items-center justify-center"
-              style={{ background: "var(--primary)", color: "var(--primary-foreground)" }}
+      
             >
               <span className="font-black text-sm">E</span>
             </div>

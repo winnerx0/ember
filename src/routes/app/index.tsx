@@ -153,12 +153,10 @@ function NewProjectModal({
     if (!name.trim()) return;
 
     try {
-      console.log("user", user?.id)
       await createMutation.mutateAsync({
         data: {
           name: name.trim(),
           description: description.trim() || undefined,
-          user_id: user?.id!
         },
       });
     } catch (error) {
@@ -250,8 +248,6 @@ export default function AppDashboard() {
         return user;
       },
     })
-
-    console.log("user", user)
 
   const deleteMutation = useMutation({
     mutationFn: deleteProject,
