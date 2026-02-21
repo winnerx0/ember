@@ -10,7 +10,8 @@ A visual PostgreSQL schema designer built for developers who want to design data
 - **Visual ERD Designer** - Drag, drop, and connect tables on an infinite canvas powered by React Flow
 - **Smart Relationships** - Draw foreign key relationships with crow's feet notation (one-to-one, one-to-many, many-to-many)
 - **SQL Export** - Generate production-ready PostgreSQL DDL with CREATE TABLE, FOREIGN KEY constraints, and indexes
-- **Instant Persistence** - Every change is saved to PostgreSQL instantly with Redis caching for blazing fast performance
+- **Realtime Collaboration** - See changes from other users instantly with Supabase Realtime subscriptions
+- **Instant Persistence** - Every change is saved to PostgreSQL instantly via Supabase
 - **Rich Column Types** - Full PostgreSQL type support including UUID, JSONB, TIMESTAMPTZ, arrays, and more
 - **Auto Layout** - One-click intelligent table arrangement with zoom, pan, and minimap
 - **Dark/Light Theme** - Beautiful theme system with smooth transitions
@@ -18,13 +19,20 @@ A visual PostgreSQL schema designer built for developers who want to design data
 
 ## Quick Start
 
+Want to get started quickly? Check out the [Quick Start Guide](QUICKSTART.md) for a 5-minute setup!
+
+For detailed instructions, see [SETUP.md](SETUP.md).
+
 ### Prerequisites
 
 - Node.js 18+ or Bun
-- PostgreSQL 14+
-- Redis (optional, for caching)
+- Supabase account (free tier available at https://supabase.com)
 
 ### Installation
+
+See the detailed [SETUP.md](SETUP.md) guide for complete setup instructions.
+
+Quick start:
 
 1. Clone the repository:
 ```bash
@@ -44,18 +52,16 @@ bun install
 cp .env.example .env
 ```
 
-Edit `.env` with your database credentials:
+Edit `.env` with your Supabase credentials:
 ```env
-DATABASE_URL=postgresql://user:password@localhost:5432/ember
-REDIS_URL=redis://localhost:6379
+VITE_SUPABASE_URL=your_supabase_project_url
+VITE_SUPABASE_PUBLISHABLE_KEY=your_supabase_anon_key
 ```
 
-4. Run database migrations:
-```bash
-npm run db:migrate
-# or
-bun run db:migrate
-```
+4. Set up your Supabase database:
+   - Create a new project in Supabase
+   - Run the SQL schema from `supabase/schema.sql` in the SQL editor
+   - Enable Realtime for the tables: `projects`, `erd_tables`, `erd_columns`, `erd_relationships`
 
 5. Start the development server:
 ```bash
@@ -70,8 +76,7 @@ bun run dev
 
 - **Frontend**: React 18, TanStack Router, TanStack Start
 - **Canvas**: React Flow (for the ERD canvas)
-- **Database**: PostgreSQL, Drizzle ORM
-- **Caching**: Redis
+- **Database**: PostgreSQL via Supabase (with realtime subscriptions)
 - **Styling**: Tailwind CSS, shadcn/ui
 - **Build**: Vite
 - **Runtime**: Node.js or Bun
@@ -137,12 +142,9 @@ ember/
 │   │   │   └── ExportModal.tsx
 │   │   ├── ui/               # shadcn/ui components
 │   │   └── ThemeToggle.tsx
-│   ├── db/
-│   │   ├── schema.ts         # Drizzle schema definitions
-│   │   ├── index.ts          # Database connection
-│   │   └── migrations/       # Database migrations
+
 │   ├── lib/
-│   │   ├── redis.ts          # Redis client
+│   │   ├── supabase.ts       # Supabase client
 │   │   └── utils.ts          # Utility functions
 │   ├── routes/               # TanStack Router routes
 │   │   ├── index.tsx         # Landing page
@@ -160,24 +162,11 @@ ember/
 │   │   └── app.css           # Global styles & theme
 │   ├── client.tsx            # Client entry
 │   └── ssr.tsx               # SSR entry
-├── drizzle.config.ts         # Drizzle configuration
 ├── vite.config.ts            # Vite configuration
 └── package.json
 ```
 
 ## Development
-
-### Database Migrations
-
-Create a new migration:
-```bash
-npm run db:generate
-```
-
-Apply migrations:
-```bash
-npm run db:migrate
-```
 
 ### Building for Production
 
@@ -210,7 +199,15 @@ This project is licensed under the MIT License - see the [LICENSE](LICENSE) file
 - [React Flow](https://reactflow.dev/) - For the amazing canvas library
 - [TanStack](https://tanstack.com/) - For routing and SSR
 - [shadcn/ui](https://ui.shadcn.com/) - For beautiful UI components
-- [Drizzle ORM](https://orm.drizzle.team/) - For the excellent PostgreSQL ORM
+- [Supabase](https://supabase.com/) - For the PostgreSQL database and realtime features
+
+## Recent Updates
+
+### Bug Fixes
+- Fixed SSR hydration mismatch with theme and app loader
+- Fixed SQL export foreign key generation to correctly handle relationship directions
+- Fixed download functionality in export modal
+- Improved error handling in SQL export with proper null checks
 
 ## 📧 Contact
 
