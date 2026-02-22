@@ -5,7 +5,8 @@
   "scripts": {
     "dev": "vite",
     "build": "vite build",
-    "start": "vite start"
+    "start": "vite start",
+    "nitro": "npm:nitro-nightly@latest"
   },
   "dependencies": {
     "@supabase/ssr": "^0.8.0",
@@ -14,10 +15,12 @@
     "@tanstack/react-router": "^1.161.1",
     "@tanstack/react-start": "^1.161.1",
     "@tanstack/router-devtools": "^1.161.1",
+    "@vitejs/plugin-react": "^5.1.4",
     "@xyflow/react": "^12.4.4",
     "class-variance-authority": "^0.7.1",
     "clsx": "^2.1.1",
     "lucide-react": "^0.574.0",
+    "nitro": "^3.0.1-alpha.2",
     "react": "^19.0.0",
     "react-dom": "^19.0.0",
     "sonner": "^2.0.7",

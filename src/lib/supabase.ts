@@ -21,7 +21,6 @@ export function createSupabaseServerClient(request: Request) {
     cookies: {
       getAll() {
         const cookieHeader = request.headers.get('Cookie') ?? '';
-        console.log('Raw cookie header:', cookieHeader);
 
         const cookies = cookieHeader
           .split(';')
