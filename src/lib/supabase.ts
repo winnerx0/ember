@@ -10,12 +10,8 @@ if (!supabaseUrl || !supabasePublishablenKey) {
   );
 }
 
-// Client-side Supabase client (browser only) - uses cookies for SSR compatibility
-export const supabase = typeof window !== 'undefined'
-  ? createBrowserClient(supabaseUrl, supabasePublishablenKey)
-  : null as any;
+export const supabase = createBrowserClient(supabaseUrl, supabasePublishablenKey);
 
-// Server-side Supabase client factory
 export function createSupabaseServerClient(request: Request) {
   return createServerClient(supabaseUrl, supabasePublishablenKey, {
     cookies: {
@@ -33,8 +29,6 @@ export function createSupabaseServerClient(request: Request) {
               value: decodeURIComponent(valueParts.join('='))
             };
           });
-
-        console.log('Parsed cookies:', cookies.map(c => c.name));
         return cookies;
       },
       setAll(cookiesToSet) {

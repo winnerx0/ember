@@ -3,7 +3,6 @@ import { useEffect, useState } from "react";
 import { supabase } from "~/lib/supabase";
 import { ThemeToggle } from "~/components/ThemeToggle";
 import { Spinner } from "~/components/ui/spinner";
-import { setSessionCookies, clearSessionCookies } from "~/server/auth";
 
 export const Route = createFileRoute("/auth")({
   component: AuthPage,
