@@ -61,7 +61,7 @@ export default function AuthPage() {
     const { error } = await supabase.auth.signInWithOAuth({
       provider: "google",
       options: {
-        redirectTo: window.location.origin + "/app",
+        redirectTo: `${import.meta.env.VITE_PUBLIC_APP_URL}/app`,
       },
     });
 
