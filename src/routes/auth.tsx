@@ -58,11 +58,9 @@ export default function AuthPage() {
   }, []);
 
   const handleGoogleSignIn = async () => {
+
     const { error } = await supabase.auth.signInWithOAuth({
       provider: "google",
-      options: {
-        redirectTo: `${import.meta.env.VITE_PUBLIC_APP_URL}/app`,
-      },
     });
 
     if (error) {
