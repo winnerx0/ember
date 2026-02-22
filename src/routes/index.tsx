@@ -568,7 +568,6 @@ export default function LandingPage() {
         <section
           id="how-it-works"
           className="py-16 sm:py-20 md:py-24 px-4 sm:px-6"
-          style={{ background: "var(--accent)" }}
         >
           <div className="max-w-5xl mx-auto">
             <div className="text-center mb-12 sm:mb-16">
@@ -847,10 +846,7 @@ export default function LandingPage() {
               Ember
             </span>
           </div>
-          <p className="max-w-md mx-auto">
-            Visual PostgreSQL ERD Designer · Built with TanStack Start + React
-            Flow
-          </p>
+       
         </footer>
       </div>
     );
