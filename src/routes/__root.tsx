@@ -267,7 +267,7 @@ function RootComponent() {
         <div id="app-loader">
           <div className="loader-spinner" />
         </div>
-        <ThemeProvider attribute="class" defaultTheme="dark" enableSystem={false}>
+        <ThemeProvider attribute="class" defaultTheme="dark" enableSystem={false} disableTransitionOnChange>
           <QueryClientProvider client={queryClient}>
             <Outlet />
             <Toaster />

@@ -1,8 +1,13 @@
-import { useEffect } from "react";
+import { useEffect, useState } from "react";
 import { useTheme } from "next-themes";
 
 export function ThemeToggle() {
   const { theme, setTheme } = useTheme();
+  const [mounted, setMounted] = useState(false);
+
+  useEffect(() => {
+    setMounted(true);
+  }, []);
 
   useEffect(() => {
     // Sync with next-themes
@@ -14,6 +19,18 @@ export function ThemeToggle() {
   const toggleTheme = () => {
     setTheme(theme === "dark" ? "light" : "dark");
   };
+
+  // Don't render on server to avoid hydration mismatch
+  if (!mounted) {
+    return (
+      <button
+        className="p-2 rounded-lg transition-all hover:bg-accent"
+        aria-label="Toggle theme"
+        disabled
+        style={{ opacity: 0, pointerEvents: "none" }}
+      />
+    );
+  }
 
   return (
     <button
