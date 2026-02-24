@@ -1,30 +1,18 @@
-import { useEffect, useState } from "react";
+import { useEffect } from "react";
+import { useTheme } from "next-themes";
 
 export function ThemeToggle() {
-  const [theme, setTheme] = useState<"light" | "dark">("dark");
+  const { theme, setTheme } = useTheme();
 
   useEffect(() => {
-    // Check localStorage or system preference on mount
-    const stored = localStorage.getItem("theme");
-    if (stored === "light" || stored === "dark") {
-      setTheme(stored);
-      document.documentElement.classList.toggle("dark", stored === "dark");
-    } else {
-      // Default to system preference
-      const prefersDark = window.matchMedia(
-        "(prefers-color-scheme: dark)",
-      ).matches;
-      const defaultTheme = prefersDark ? "dark" : "light";
-      setTheme(defaultTheme);
-      document.documentElement.classList.toggle("dark", prefersDark);
+    // Sync with next-themes
+    if (theme === "dark" || theme === "light") {
+      document.documentElement.classList.toggle("dark", theme === "dark");
     }
-  }, []);
+  }, [theme]);
 
   const toggleTheme = () => {
-    const newTheme = theme === "dark" ? "light" : "dark";
-    setTheme(newTheme);
-    document.documentElement.classList.toggle("dark", newTheme === "dark");
-    localStorage.setItem("theme", newTheme);
+    setTheme(theme === "dark" ? "light" : "dark");
   };
 
   return (

@@ -187,7 +187,7 @@ function ERDCanvas() {
           setEdges((eds) => [...eds, newEdge]);
 
           // Note: FK columns will be synced via the columns realtime subscription
-          toast.info("Relationship added by collaborator");
+          // toast.info("Relationship added by collaborator");
         },
       )
       .on(
@@ -219,7 +219,7 @@ function ERDCanvas() {
                 : e,
             ),
           );
-          toast.info("Relationship updated by collaborator");
+          // toast.info("Relationship updated by collaborator");
         },
       )
       .on(
@@ -233,7 +233,7 @@ function ERDCanvas() {
           const deletedRel = payload.old as any;
 
           setEdges((eds) => eds.filter((e) => e.id !== deletedRel.id));
-          toast.info("Relationship removed by collaborator");
+          // toast.info("Relationship removed by collaborator");
         },
       )
       .subscribe();
@@ -276,7 +276,7 @@ function ERDCanvas() {
           };
 
           setNodes((nds) => [...nds, newNode]);
-          toast.info(`Table "${newTable.name}" added by collaborator`);
+          // toast.info(`Table "${newTable.name}" added by collaborator`);
         },
       )
       .on(
@@ -308,7 +308,7 @@ function ERDCanvas() {
                 : n,
             ),
           );
-          toast.info(`Table "${updatedTable.name}" updated by collaborator`);
+          // toast.info(`Table "${updatedTable.name}" updated by collaborator`);
         },
       )
       .on(
@@ -322,7 +322,7 @@ function ERDCanvas() {
           const deletedTable = payload.old as any;
 
           setNodes((nds) => nds.filter((n) => n.id !== deletedTable.id));
-          toast.info(`Table "${deletedTable.name}" removed by collaborator`);
+          // toast.info(`Table "${deletedTable.name}" removed by collaborator`);
         },
       )
       .subscribe();

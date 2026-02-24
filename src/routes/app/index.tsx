@@ -140,11 +140,11 @@ function NewProjectModal({
         return [{ ...project, tableCount: 0 }, ...old];
       });
       onClose();
-      toast.success("Project created successfully");
+      // toast.success("Project created successfully");
     },
     onError: (error) => {
       console.error("Failed to create project:", error);
-      toast.error("Failed to create project. Please try again.");
+      // toast.error("Failed to create project. Please try again.");
     },
   });
 
@@ -257,11 +257,11 @@ export default function AppDashboard() {
         return old.filter((p) => p.id !== variables.data.id);
       });
       setDeleteConfirm({ isOpen: false, projectId: null, projectName: "" });
-      toast.success("Project deleted successfully");
+      // toast.success("Project deleted successfully");
     },
     onError: (error) => {
       console.error("Failed to delete project:", error);
-      toast.error("Failed to delete project. Please try again.");
+      // toast.error("Failed to delete project. Please try again.");
     },
   });
 

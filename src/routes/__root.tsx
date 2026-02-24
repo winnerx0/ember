@@ -10,6 +10,7 @@ import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { useState } from "react";
 import { Toaster } from "~/components/ui/sonner";
 import { ThemeToggle } from "~/components/ThemeToggle";
+import { ThemeProvider } from "next-themes";
 import appCss from "~/styles/app.css?url";
 
 export const Route = createRootRoute({
@@ -205,16 +206,19 @@ function RootComponent() {
   }));
 
   return (
-    <html lang="en" className="dark">
+    <html lang="en">
       <head>
         <HeadContent />
         <script
           dangerouslySetInnerHTML={{
             __html: `
               (function() {
-                const theme = localStorage.getItem('theme') || 'dark';
-                if (theme === 'light') {
-                  document.documentElement.classList.remove('dark');
+                const loader = document.getElementById('app-loader');
+                if (loader) {
+                  window.addEventListener('load', function() {
+                    loader.classList.add('loaded');
+                    setTimeout(() => loader.remove(), 300);
+                  });
                 }
               })();
             `,
@@ -236,7 +240,7 @@ function RootComponent() {
               html:not(.dark) #app-loader {
                 background: oklch(1 0 0);
               }
-              body.hydrated #app-loader {
+              #app-loader.loaded {
                 opacity: 0;
                 pointer-events: none;
               }
@@ -263,24 +267,13 @@ function RootComponent() {
         <div id="app-loader">
           <div className="loader-spinner" />
         </div>
-        <QueryClientProvider client={queryClient}>
-          <Outlet />
-          <Toaster />
-          <Scripts />
-        </QueryClientProvider>
-        <script
-          dangerouslySetInnerHTML={{
-            __html: `
-              window.addEventListener('load', function() {
-                document.body.classList.add('hydrated');
-                const loader = document.getElementById('app-loader');
-                if (loader) {
-                  setTimeout(() => loader.remove(), 300);
-                }
-              });
-            `,
-          }}
-        />
+        <ThemeProvider attribute="class" defaultTheme="dark" enableSystem={false}>
+          <QueryClientProvider client={queryClient}>
+            <Outlet />
+            <Toaster />
+            <Scripts />
+          </QueryClientProvider>
+        </ThemeProvider>
       </body>
     </html>
   );
