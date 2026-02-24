@@ -22,14 +22,7 @@ export function ThemeToggle() {
 
   // Don't render on server to avoid hydration mismatch
   if (!mounted) {
-    return (
-      <button
-        className="p-2 rounded-lg transition-all hover:bg-accent"
-        aria-label="Toggle theme"
-        disabled
-        style={{ opacity: 0, pointerEvents: "none" }}
-      />
-    );
+    return null;
   }
 
   return (
