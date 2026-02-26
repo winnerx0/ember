@@ -1,6 +1,13 @@
 import { useState, useEffect } from "react";
 import { exportSQL } from "~/server/export";
 import { Button } from "~/components/ui/button";
+import {
+  Dialog,
+  DialogContent,
+  DialogHeader,
+  DialogTitle,
+  DialogDescription,
+} from "~/components/ui/dialog";
 
 type Props = {
   projectId: string;
@@ -9,7 +16,7 @@ type Props = {
 };
 
 function highlightSQL(sql: string): string {
-  if (!sql) return '';
+  if (!sql) return "";
   return sql
     .replace(
       /\b(CREATE|TABLE|IF|NOT|EXISTS|ALTER|ADD|CONSTRAINT|FOREIGN|KEY|REFERENCES|PRIMARY|UNIQUE|DEFAULT|INDEX|ON)\b/g,
@@ -58,25 +65,17 @@ export function ExportModal({ projectId, projectName, onClose }: Props) {
   };
 
   return (
-    <div
-      className="fixed inset-0 z-50 flex items-center justify-center p-4"
-      style={{ background: "rgba(0,0,0,0.8)", backdropFilter: "blur(8px)" }}
-      onClick={(e) => e.target === e.currentTarget && onClose()}
-    >
-      <div
-        className="w-full max-w-3xl rounded-2xl border flex flex-col overflow-hidden"
-        style={{ background: "var(--card)", borderColor: "var(--border)", maxHeight: "85vh" }}
-      >
-        {/* Header */}
-        <div className="flex items-center justify-between px-6 py-4 border-b" style={{ borderColor: "var(--border)" }}>
+    <Dialog open={true} onOpenChange={onClose}>
+      <DialogContent className="sm:max-w-3xl max-h-[85vh] flex flex-col p-0 overflow-hidden">
+        <DialogHeader className="px-6 py-4 border-b flex-row items-center justify-between space-y-0">
           <div>
-            <h2 className="font-bold text-lg" style={{ color: "var(--card-foreground)" }}>Export SQL</h2>
-            <p className="text-xs mt-0.5" style={{ color: "var(--muted-foreground)" }}>
+            <DialogTitle>Export SQL</DialogTitle>
+            <DialogDescription className="text-xs mt-0.5">
               PostgreSQL DDL for{" "}
-              <span style={{ color: "var(--primary)" }}>{projectName}</span>
-            </p>
+              <span className="text-primary font-medium">{projectName}</span>
+            </DialogDescription>
           </div>
-          <div className="flex items-center gap-2">
+          <div className="flex items-center gap-2 mr-6">
             <Button
               onClick={handleCopy}
               disabled={loading || !sql}
@@ -92,46 +91,35 @@ export function ExportModal({ projectId, projectName, onClose }: Props) {
             >
               ↓ Download .sql
             </Button>
-            <Button
-              onClick={onClose}
-              variant="ghost"
-              size="icon"
-              className="h-8 w-8"
-            >
-              ✕
-            </Button>
           </div>
-        </div>
+        </DialogHeader>
 
-        {/* SQL content */}
         <div className="flex-1 overflow-auto p-6">
           {loading ? (
-            <div className="flex items-center justify-center h-48" style={{ color: "var(--muted-foreground)" }}>
+            <div className="flex items-center justify-center h-48 text-muted-foreground">
               <div className="flex items-center gap-3">
-                <div className="w-5 h-5 border-2 rounded-full animate-spin" style={{ borderColor: "var(--border)", borderTopColor: "var(--primary)" }} />
+                <div className="w-5 h-5 border-2 rounded-full animate-spin border-border border-t-primary" />
                 Generating SQL...
               </div>
             </div>
           ) : (
             <pre
-              className="sql-code whitespace-pre-wrap"
-              style={{ color: "var(--foreground)" }}
+              className="sql-code whitespace-pre-wrap text-foreground"
               dangerouslySetInnerHTML={{ __html: highlightSQL(sql) }}
             />
           )}
         </div>
 
-        {/* Footer stats */}
         {!loading && sql && (
-          <div className="px-6 py-3 border-t flex items-center gap-4 text-xs" style={{ borderColor: "var(--border)", color: "var(--muted-foreground)" }}>
+          <div className="px-6 py-3 border-t flex items-center gap-4 text-xs text-muted-foreground">
             <span>{sql.split("\n").length} lines</span>
             <span>{sql.length} characters</span>
-            <span className="ml-auto text-green-400">
+            <span className="ml-auto text-green-500 font-medium">
               ✓ Valid PostgreSQL DDL
             </span>
           </div>
         )}
-      </div>
-    </div>
+      </DialogContent>
+    </Dialog>
   );
 }

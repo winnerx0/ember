@@ -10,13 +10,16 @@ const Toaster = ({ ...props }: ToasterProps) => {
       toastOptions={{
         classNames: {
           toast:
-            "group toast group-[.toaster]:bg-[var(--background)] group-[.toaster]:text-[var(--foreground)] group-[.toaster]:border-[var(--border)] group-[.toaster]:shadow-lg",
-          description: "group-[.toast]:text-[var(--muted-foreground)]",
+            "group toast group-[.toaster]:bg-card group-[.toaster]:text-card-foreground group-[.toaster]:border-border group-[.toaster]:shadow-2xl group-[.toaster]:rounded-xl group-[.toaster]:p-4",
+          description:
+            "group-[.toast]:text-muted-foreground group-[.toast]:text-xs",
           actionButton:
-            "group-[.toast]:bg-[var(--primary)] group-[.toast]:text-[var(--primary-foreground)]",
+            "group-[.toast]:bg-primary group-[.toast]:text-primary-foreground font-medium",
           cancelButton:
-            "group-[.toast]:bg-[var(--muted)] group-[.toast]:text-[var(--muted-foreground)]",
-          error: "group-[.toast]:bg-[var(--destructive)] group-[.toast]:text-[var(--destructive-foreground)] group-[.toast]:border-[var(--destructive)]",
+            "group-[.toast]:bg-muted group-[.toast]:text-muted-foreground",
+          error:
+            "group-[.toast]:bg-destructive group-[.toast]:text-destructive-foreground group-[.toast]:border-destructive",
+          success: "group-[.toast]:text-green-500",
         },
       }}
       {...props}

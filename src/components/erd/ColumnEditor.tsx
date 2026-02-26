@@ -2,8 +2,15 @@ import { useState } from "react";
 import { Button } from "~/components/ui/button";
 import { Input } from "~/components/ui/input";
 import { Label } from "~/components/ui/label";
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "~/components/ui/select";
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "~/components/ui/select";
 import { Checkbox } from "~/components/ui/checkbox";
+import { cn } from "~/lib/utils";
 
 const PG_TYPES = [
   "uuid",
@@ -28,11 +35,11 @@ const PG_TYPES = [
 ];
 
 const TABLE_COLORS = [
-  "var(--chart-1)", // Blue - default
-  "var(--chart-2)", // Teal
-  "var(--chart-3)", // Green
-  "var(--chart-4)", // Orange
-  "var(--chart-5)", // Purple
+  "oklch(0.488 0.243 264.376)", // Blue/Purple - dark mode chart-1
+  "oklch(0.696 0.17 162.48)",   // Teal - dark mode chart-2
+  "oklch(0.769 0.188 70.08)",   // Green - dark mode chart-3
+  "oklch(0.627 0.265 303.9)",   // Purple - dark mode chart-4
+  "oklch(0.645 0.246 16.439)",  // Orange - dark mode chart-5
 ];
 
 export type ColumnDraft = {
@@ -69,7 +76,12 @@ type Props = {
   onClose: () => void;
 };
 
-export function ColumnEditor({ table, relationships = [], onSave, onClose }: Props) {
+export function ColumnEditor({
+  table,
+  relationships = [],
+  onSave,
+  onClose,
+}: Props) {
   const [name, setName] = useState(table.name);
   const [color, setColor] = useState(table.color);
   const [columns, setColumns] = useState<ColumnDraft[]>(
@@ -94,27 +106,33 @@ export function ColumnEditor({ table, relationships = [], onSave, onClose }: Pro
   const getFKInfo = (columnName: string) => {
     // Check if this table is the target (has the FK)
     // For one-to-one, one-to-many, and many-to-one relationships
-    const asTarget = relationships.find(
-      rel => {
-        // For one-to-many and one-to-one: target table has FK
-        if ((rel.type === 'one-to-many' || rel.type === 'one-to-one') && rel.targetTableId === table.id) {
-          const expectedFKName = `${rel.sourceTableName}_id`;
-          return columnName === expectedFKName;
-        }
-        // For many-to-one: source table has FK
-        if (rel.type === 'many-to-one' && rel.sourceTableId === table.id) {
-          const expectedFKName = `${rel.targetTableName}_id`;
-          return columnName === expectedFKName;
-        }
-        return false;
+    const asTarget = relationships.find((rel) => {
+      // For one-to-many and one-to-one: target table has FK
+      if (
+        (rel.type === "one-to-many" || rel.type === "one-to-one") &&
+        rel.targetTableId === table.id
+      ) {
+        const expectedFKName = `${rel.sourceTableName}_id`;
+        return columnName === expectedFKName;
       }
-    );
+      // For many-to-one: source table has FK
+      if (rel.type === "many-to-one" && rel.sourceTableId === table.id) {
+        const expectedFKName = `${rel.targetTableName}_id`;
+        return columnName === expectedFKName;
+      }
+      return false;
+    });
 
     if (asTarget) {
-      const referencedTable = asTarget.type === 'many-to-one'
-        ? asTarget.targetTableName
-        : asTarget.sourceTableName;
-      return { isFK: true, referencesTable: referencedTable, direction: 'references' };
+      const referencedTable =
+        asTarget.type === "many-to-one"
+          ? asTarget.targetTableName
+          : asTarget.sourceTableName;
+      return {
+        isFK: true,
+        referencesTable: referencedTable,
+        direction: "references",
+      };
     }
 
     return { isFK: false, referencesTable: null, direction: null };
@@ -159,7 +177,7 @@ export function ColumnEditor({ table, relationships = [], onSave, onClose }: Pro
     setSaving(true);
     try {
       // Replace spaces with underscores in table name
-      const sanitizedName = name.trim().replace(/\s+/g, '_');
+      const sanitizedName = name.trim().replace(/\s+/g, "_");
 
       await onSave({
         name: sanitizedName,
@@ -167,10 +185,9 @@ export function ColumnEditor({ table, relationships = [], onSave, onClose }: Pro
         columns: columns.map((c, i) => ({ ...c, order: i })),
       });
 
-      // Close the editor after successful save
-      onClose();
+      // Note: onClose is now called by the parent after cache invalidation
     } catch (error) {
-      console.error('Failed to save:', error);
+      console.error("Failed to save:", error);
       // Don't close on error so user can retry
     } finally {
       setSaving(false);
@@ -178,26 +195,26 @@ export function ColumnEditor({ table, relationships = [], onSave, onClose }: Pro
   };
 
   return (
-    <div
-      className="fixed right-0 top-0 bottom-0 w-96 z-40 flex flex-col border-l overflow-hidden"
-      style={{ background: "var(--card)", borderColor: "var(--border)" }}
-    >
+    <div className="fixed right-0 top-0 bottom-0 w-96 z-40 flex flex-col overflow-hidden border-l border-border bg-card shadow-2xl">
       {/* Header */}
-      <div className="flex items-center justify-between px-5 py-4 border-b" style={{ borderColor: "var(--border)" }}>
-        <h3 className="font-bold text-base" style={{ color: "var(--card-foreground)" }}>Edit Table</h3>
-        <button
+      <div className="flex items-center justify-between px-5 py-4 border-b border-border">
+        <h3 className="font-bold text-base text-card-foreground">Edit Table</h3>
+        <Button
+          variant={"ghost"}
           onClick={onClose}
-          className="p-1.5 rounded-lg transition-all"
-          style={{ color: "var(--muted-foreground)" }}
+          className="p-1.5 rounded-full transition-all hover:bg-accent size-8 text-muted-foreground"
         >
           ✕
-        </button>
+        </Button>
       </div>
 
-      <div className="flex-1 overflow-y-auto p-5 space-y-5">
+      <div className="flex-1 overflow-y-auto p-5 space-y-6">
         {/* Table name */}
         <div className="space-y-2">
-          <Label htmlFor="table-name" className="text-xs font-semibold uppercase tracking-wider" style={{ color: "var(--muted-foreground)" }}>
+          <Label
+            htmlFor="table-name"
+            className="text-[10px] font-bold uppercase tracking-widest opacity-50"
+          >
             Table Name
           </Label>
           <Input
@@ -205,176 +222,184 @@ export function ColumnEditor({ table, relationships = [], onSave, onClose }: Pro
             type="text"
             value={name}
             onChange={(e) => setName(e.target.value)}
+            className="h-10 text-sm font-medium focus-visible:ring-primary/50"
           />
         </div>
 
         {/* Color picker */}
-        <div>
-          <label className="block text-xs font-semibold mb-2 uppercase tracking-wider" style={{ color: "var(--muted-foreground)" }}>
-            Color
-          </label>
+        <div className="space-y-2">
+          <Label className="text-[10px] font-bold uppercase tracking-widest opacity-50">
+            Table Color
+          </Label>
           <div className="flex gap-2 flex-wrap">
             {TABLE_COLORS.map((c) => (
-              <button
+              <Button
                 key={c}
                 onClick={() => setColor(c)}
-                className="w-7 h-7 rounded-lg transition-all hover:scale-110"
-                style={{
-                  background: c,
-                  boxShadow:
-                    color === c ? `0 0 0 2px var(--border), 0 0 0 4px ${c}` : "none",
-                }}
+                className={cn(
+                  "w-8 h-8 rounded-lg transition-all hover:scale-110 active:scale-95 border",
+                  color === c
+                    ? "ring-2 ring-primary ring-offset-2 ring-offset-background"
+                    : "border-border",
+                )}
+                style={{ background: c }}
               />
             ))}
           </div>
         </div>
 
         {/* Columns */}
-        <div>
-          <div className="flex items-center justify-between mb-3">
-            <Label className="text-xs font-semibold uppercase tracking-wider" style={{ color: "var(--muted-foreground)" }}>
+        <div className="space-y-4">
+          <div className="flex items-center justify-between">
+            <Label className="text-[10px] font-bold uppercase tracking-widest opacity-50">
               Columns ({columns.length})
             </Label>
             <Button
               onClick={addColumn}
-              variant="outline"
+              variant="secondary"
               size="sm"
+              className="h-8 px-3 text-xs font-bold"
             >
-              + Add
+              + Add Column
             </Button>
           </div>
 
-          <div className="space-y-2">
+          <div className="space-y-3">
             {columns.map((col, idx) => {
               const fkInfo = getFKInfo(col.name);
               return (
-              <div
-                key={col.id}
-                className="rounded-xl border overflow-hidden"
-                style={{ background: "var(--accent)", borderColor: "var(--border)" }}
-              >
-                {/* Column row header */}
-                <div className="flex items-center gap-2 px-3 py-2 border-b" style={{ borderColor: "var(--border)" }}>
-                  <span className="text-xs w-4" style={{ color: "var(--muted-foreground)" }}>{idx + 1}</span>
-                  <Input
-                    type="text"
-                    value={col.name}
-                    onChange={(e) =>
-                      updateColumn(col.id, "name", e.target.value)
-                    }
-                    placeholder="column_name"
-                    className="flex-1 h-7 text-sm border-0 bg-transparent px-0 focus-visible:ring-0"
-                  />
-                  {fkInfo.isFK && fkInfo.direction === 'references' && (
-                    <span
-                      className="text-[9px] px-2 py-0.5 rounded-full font-bold"
-                      style={{
-                        background: "rgba(96, 165, 250, 0.15)",
-                        color: "#60a5fa",
-                        border: "1px solid rgba(96, 165, 250, 0.3)",
-                      }}
-                      title={`References ${fkInfo.referencesTable}`}
-                    >
-                      FK → {fkInfo.referencesTable}
+                <div className="rounded-xl border border-border bg-background transition-all duration-200" key={col.id}>
+
+                  {/* Column Header */}
+                  <div className="flex items-center gap-2 px-3 py-2.5 border-b border-border bg-card/30">
+                    <span className="text-[10px] font-mono w-4 opacity-40">
+                      {idx + 1}
                     </span>
-                  )}
-                  <Button
-                    onClick={() => removeColumn(col.id)}
-                    variant="ghost"
-                    size="icon"
-                    className="h-6 w-6 text-red-400 hover:text-red-300"
-                  >
-                    ✕
-                  </Button>
-                </div>
-
-                {/* Column details */}
-                <div className="px-3 py-2 space-y-2">
-                  {/* Type */}
-                  <Select
-                    value={col.type}
-                    onValueChange={(value) => updateColumn(col.id, "type", value)}
-                  >
-                    <SelectTrigger>
-                      <SelectValue />
-                    </SelectTrigger>
-                    <SelectContent
-                      className="max-h-[300px] overflow-y-auto"
-                    >
-                      {PG_TYPES.map((t) => (
-                        <SelectItem key={t} value={t}>
-                          {t}
-                        </SelectItem>
-                      ))}
-                    </SelectContent>
-                  </Select>
-
-                  {/* Flags */}
-                  <div className="flex gap-3 flex-wrap">
-                    {[
-                      { key: "isPrimary", label: "PK" },
-                      { key: "isUnique", label: "Unique" },
-                    ].map(({ key, label }) => (
-                      <label
-                        key={key}
-                        className="flex items-center gap-2 cursor-pointer"
+                    <Input
+                      type="text"
+                      value={col.name}
+                      onChange={(e) =>
+                        updateColumn(col.id, "name", e.target.value)
+                      }
+                      placeholder="column_name"
+                      className="flex-1 h-7 text-sm border-none bg-transparent px-0 font-medium focus-visible:ring-0 placeholder:opacity-30"
+                    />
+                    {fkInfo.isFK && (
+                      <div
+                        className="flex items-center gap-1.5 px-2 py-0.5 rounded-full text-[9px] font-bold shrink-0"
+                        style={{
+                          background: "oklch(0.708 0 0 / 10%)",
+                          color: "oklch(0.488 0.243 264.376)",
+                        }}
                       >
-                        <Checkbox
-                          checked={col[key as keyof ColumnDraft] as boolean}
-                          onChange={(e: React.ChangeEvent<HTMLInputElement>) =>
-                            updateColumn(
-                              col.id,
-                              key as keyof ColumnDraft,
-                              e.target.checked,
-                            )
-                          }
-                        />
-                        <span className="text-xs" style={{ color: "var(--muted-foreground)" }}>{label}</span>
-                      </label>
-                    ))}
-                    {/* Required checkbox (inverse of nullable) */}
-                    <label className="flex items-center gap-2 cursor-pointer">
-                      <Checkbox
-                        checked={!col.nullable}
-                        onChange={(e: React.ChangeEvent<HTMLInputElement>) =>
-                          updateColumn(col.id, "nullable", !e.target.checked)
-                        }
-                      />
-                      <span className="text-xs" style={{ color: "var(--muted-foreground)" }}>Required</span>
-                    </label>
+                        FK → {fkInfo.referencesTable}
+                      </div>
+                    )}
+                    <Button
+                      onClick={() => removeColumn(col.id)}
+                      variant="ghost"
+                      size="icon"
+                      className="h-7 w-7 text-muted-foreground hover:text-destructive hover:bg-destructive/10 shrink-0"
+                    >
+                      ✕
+                    </Button>
                   </div>
 
-                  {/* Default value */}
-                  <Input
-                    type="text"
-                    value={col.defaultValue}
-                    onChange={(e) =>
-                      updateColumn(col.id, "defaultValue", e.target.value)
-                    }
-                    placeholder="Default value (optional)"
-                    className="text-xs"
-                  />
+                  {/* Column Settings */}
+                  <div className="p-3 space-y-3">
+                    {/* Type Selection */}
+                    <div className="space-y-1.5">
+                      <Label className="text-[10px] uppercase font-bold opacity-50">
+                        Type
+                      </Label>
+                      <Select
+                        value={col.type}
+                        onValueChange={(val) =>
+                          updateColumn(col.id, "type", val)
+                        }
+                      >
+                        <SelectTrigger className="h-8 text-xs bg-card/50 border-none ring-1 ring-border shadow-none">
+                          <SelectValue />
+                        </SelectTrigger>
+                        <SelectContent>
+                          {PG_TYPES.map((t) => (
+                            <SelectItem key={t} value={t} className="text-xs">
+                              {t}
+                            </SelectItem>
+                          ))}
+                        </SelectContent>
+                      </Select>
+                    </div>
+
+                    {/* Flags */}
+                    <div className="grid grid-cols-3 gap-2">
+                      {[
+                        { key: "isPrimary", label: "PK" },
+                        { key: "isUnique", label: "Unique" },
+                        { key: "nullable", label: "NN", inverse: true },
+                      ].map(({ key, label, inverse }) => (
+                        <label
+                          key={key}
+                          className="flex items-center justify-start px-4 gap-2 h-8 rounded-lg border border-border/50 bg-card/30 cursor-pointer hover:bg-card/50 transition-colors"
+                        >
+                          <Checkbox
+                            checked={
+                              inverse
+                                ? !col.nullable
+                                : !!col[key as keyof ColumnDraft]
+                            }
+                            onCheckedChange={(checked: boolean) =>
+                              updateColumn(
+                                col.id,
+                                key as keyof ColumnDraft,
+                                inverse ? !checked : checked,
+                              )
+                            }
+                            className="h-3.5 w-3.5"
+                          />
+                          <span className="text-[10px] font-bold opacity-70">
+                            {label}
+                          </span>
+                        </label>
+                      ))}
+                    </div>
+
+                    {/* Default Value */}
+                    <div className="space-y-1.5">
+                      <Label className="text-[10px] uppercase font-bold opacity-50">
+                        Default
+                      </Label>
+                      <Input
+                        type="text"
+                        value={col.defaultValue}
+                        onChange={(e) =>
+                          updateColumn(col.id, "defaultValue", e.target.value)
+                        }
+                        placeholder="e.g. now()"
+                        className="h-8 text-xs bg-card/50 border-none ring-1 ring-border shadow-none focus-visible:ring-primary/50"
+                      />
+                    </div>
+                  </div>
                 </div>
-              </div>
-            );
+              );
             })}
           </div>
         </div>
       </div>
 
       {/* Footer */}
-      <div className="px-5 py-4 border-t flex gap-3" style={{ borderColor: "var(--border)" }}>
+      <div className="px-5 py-4 border-t border-border flex gap-3 bg-card">
         <Button
           onClick={onClose}
-          variant="outline"
-          className="flex-1"
+          variant="ghost"
+          className="flex-1 h-10 font-bold"
         >
           Cancel
         </Button>
         <Button
           onClick={handleSave}
           disabled={!name.trim() || saving}
-          className="flex-1"
+          className="flex-1 h-10 font-bold"
         >
           {saving ? "Saving..." : "Save Changes"}
         </Button>

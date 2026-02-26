@@ -1,4 +1,6 @@
-import { createFileRoute, Link } from "@tanstack/react-router";
+"use client";
+
+import Link from "next/link";
 import { useState } from "react";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { getProjects, createProject, deleteProject } from "~/server/projects";
@@ -8,14 +10,18 @@ import { Input } from "~/components/ui/input";
 import { Textarea } from "~/components/ui/textarea";
 import { Label } from "~/components/ui/label";
 import { ConfirmModal } from "~/components/ui/confirm-modal";
+import {
+  Dialog,
+  DialogContent,
+  DialogHeader,
+  DialogTitle,
+  DialogDescription,
+} from "~/components/ui/dialog";
 import { Spinner } from "~/components/ui/spinner";
 import { supabase } from "~/lib/supabase";
 import { toast } from "sonner";
+import { UserMenu } from "~/components/UserMenu";
 import type { User } from "@supabase/supabase-js";
-
-export const Route = createFileRoute("/app/")({
-  component: AppDashboard,
-});
 
 function ProjectCard({
   project,
@@ -43,12 +49,11 @@ function ProjectCard({
 
   return (
     <Link
-      to="/app/$projectId"
-      params={{ projectId: project.id }}
-      className="group block p-6 rounded-2xl border transition-all duration-300 hover:-translate-y-1 hover:shadow-2xl"
+      href={`/app/${project.id}`}
+      className="group block p-6 rounded-2xl border transition-all duration-300 hover=-translate-y-1 hover:shadow-2xl"
       style={{
         background: "var(--card)",
-        borderColor: "var(--border)"
+        borderColor: "var(--border)",
       }}
     >
       <div className="flex items-start justify-between mb-4">
@@ -58,7 +63,7 @@ function ProjectCard({
             background: "var(--accent)",
             borderColor: "var(--border)",
             color: "var(--accent-foreground)",
-            border: "1px solid"
+            border: "1px solid",
           }}
         >
           {project.name[0].toUpperCase()}
@@ -72,7 +77,7 @@ function ProjectCard({
           className="opacity-0 group-hover:opacity-100 p-1.5 rounded-lg transition-all"
           style={{
             color: "var(--destructive)",
-            background: "transparent"
+            background: "transparent",
           }}
           title="Delete project"
         >
@@ -94,19 +99,34 @@ function ProjectCard({
         </Button>
       </div>
 
-      <h3 className="font-bold text-base mb-1 transition-colors" style={{ color: "var(--card-foreground)" }}>
+      <h3
+        className="font-bold text-base mb-1 transition-colors"
+        style={{ color: "var(--card-foreground)" }}
+      >
         {project.name}
       </h3>
       {project.description && (
-        <p className="text-sm mb-3 line-clamp-2" style={{ color: "var(--muted-foreground)" }}>
+        <p
+          className="text-sm mb-3 line-clamp-2"
+          style={{ color: "var(--muted-foreground)" }}
+        >
           {project.description}
         </p>
       )}
 
-      <div className="flex items-center justify-between mt-4 pt-4 border-t" style={{ borderColor: "var(--border)" }}>
+      <div
+        className="flex items-center justify-between mt-4 pt-4 border-t"
+        style={{ borderColor: "var(--border)" }}
+      >
         <div className="flex items-center gap-3">
-          <span className="text-xs" style={{ color: "var(--muted-foreground)" }}>
-            <span className="font-semibold" style={{ color: "var(--foreground)" }}>
+          <span
+            className="text-xs"
+            style={{ color: "var(--muted-foreground)" }}
+          >
+            <span
+              className="font-semibold"
+              style={{ color: "var(--foreground)" }}
+            >
               {project.tableCount}
             </span>{" "}
             {project.tableCount === 1 ? "table" : "tables"}
@@ -125,12 +145,11 @@ function NewProjectModal({
   user,
 }: {
   onClose: () => void;
-  user: User | null | undefined
+  user: User | null | undefined;
 }) {
   const queryClient = useQueryClient();
   const [name, setName] = useState("");
   const [description, setDescription] = useState("");
-
 
   const createMutation = useMutation({
     mutationFn: createProject,
@@ -165,16 +184,14 @@ function NewProjectModal({
   };
 
   return (
-    <div
-      className="fixed inset-0 z-50 flex items-center justify-center p-4"
-      style={{ background: "rgba(0,0,0,0.7)", backdropFilter: "blur(8px)" }}
-      onClick={(e) => e.target === e.currentTarget && onClose()}
-    >
-      <div
-        className="w-full max-w-md rounded-2xl p-6 border"
-        style={{ background: "var(--card)", borderColor: "var(--border)" }}
-      >
-        <h2 className="text-xl font-bold mb-6" style={{ color: "var(--card-foreground)" }}>New Project</h2>
+    <Dialog open={true} onOpenChange={onClose}>
+      <DialogContent className="sm:max-w-md">
+        <DialogHeader>
+          <DialogTitle>New Project</DialogTitle>
+          <DialogDescription>
+            Create a new project to start designing your PostgreSQL schema.
+          </DialogDescription>
+        </DialogHeader>
         <form onSubmit={handleSubmit} className="space-y-4">
           <div className="space-y-2">
             <Label htmlFor="name">Project Name *</Label>
@@ -185,7 +202,7 @@ function NewProjectModal({
               onChange={(e) => setName(e.target.value)}
               placeholder="e.g. blog_schema, ecommerce_db"
               autoFocus
-              />
+            />
           </div>
           <div className="space-y-2">
             <Label htmlFor="description">Description</Label>
@@ -222,8 +239,8 @@ function NewProjectModal({
             </Button>
           </div>
         </form>
-      </div>
-    </div>
+      </DialogContent>
+    </Dialog>
   );
 }
 
@@ -241,13 +258,15 @@ export default function AppDashboard() {
     queryFn: () => getProjects(),
   });
 
-    const { data: user } = useQuery({
-      queryKey: ["user"],
-      queryFn: async () => {
-        const { data: { user } } = await supabase.auth.getUser();
-        return user;
-      },
-    })
+  const { data: user } = useQuery({
+    queryKey: ["user"],
+    queryFn: async () => {
+      const {
+        data: { user },
+      } = await supabase.auth.getUser();
+      return user;
+    },
+  });
 
   const deleteMutation = useMutation({
     mutationFn: deleteProject,
@@ -277,7 +296,10 @@ export default function AppDashboard() {
 
   if (isLoading) {
     return (
-      <div className="min-h-screen flex items-center justify-center" style={{ background: "var(--background)" }}>
+      <div
+        className="min-h-screen flex items-center justify-center"
+        style={{ background: "var(--background)" }}
+      >
         <Spinner size="lg" />
       </div>
     );
@@ -286,28 +308,45 @@ export default function AppDashboard() {
   return (
     <div className="min-h-screen" style={{ background: "var(--background)" }}>
       {/* Header */}
-      <header className="border-b px-6 py-4 flex items-center justify-between" style={{ borderColor: "var(--border)" }}>
+      <header
+        className="border-b px-6 py-4 flex items-center justify-between"
+        style={{ borderColor: "var(--border)" }}
+      >
         <div className="flex items-center gap-3">
           <Link
-            to="/"
+            href="/"
             className="flex items-center gap-2 hover:opacity-80 transition-opacity"
           >
-            <div className="w-7 h-7 rounded-lg flex items-center justify-center" style={{ background: "var(--primary)", color: "var(--primary-foreground)" }}>
+            <div
+              className="w-7 h-7 rounded-lg flex items-center justify-center"
+              style={{
+                background: "var(--primary)",
+                color: "var(--primary-foreground)",
+              }}
+            >
               <span className="font-black text-xs">E</span>
             </div>
-            <span className="font-bold text-sm" style={{ color: "var(--foreground)" }}>Ember</span>
+            <span
+              className="font-bold text-sm"
+              style={{ color: "var(--foreground)" }}
+            >
+              Ember
+            </span>
           </Link>
           <span style={{ color: "var(--muted-foreground)" }}>/</span>
-          <span className="text-sm font-medium" style={{ color: "var(--foreground)" }}>Projects</span>
+          <span
+            className="text-sm font-medium"
+            style={{ color: "var(--foreground)" }}
+          >
+            Projects
+          </span>
         </div>
         <div className="flex items-center gap-3">
           <ThemeToggle />
-          <Button
-            onClick={() => setShowModal(true)}
-            size="sm"
-          >
+          <Button onClick={() => setShowModal(true)} size="sm">
             + New Project
           </Button>
+          <UserMenu user={user} />
         </div>
       </header>
 
@@ -320,20 +359,25 @@ export default function AppDashboard() {
               style={{
                 background: "var(--accent)",
                 borderColor: "var(--border)",
-                color: "var(--accent-foreground)"
+                color: "var(--accent-foreground)",
               }}
             >
               ⬡
             </div>
-            <h2 className="text-2xl font-bold mb-3" style={{ color: "var(--foreground)" }}>No projects yet</h2>
-            <p className="mb-8 max-w-sm" style={{ color: "var(--muted-foreground)" }}>
+            <h2
+              className="text-2xl font-bold mb-3"
+              style={{ color: "var(--foreground)" }}
+            >
+              No projects yet
+            </h2>
+            <p
+              className="mb-8 max-w-sm"
+              style={{ color: "var(--muted-foreground)" }}
+            >
               Create your first project to start designing your PostgreSQL
               schema visually.
             </p>
-            <Button
-              onClick={() => setShowModal(true)}
-              size="lg"
-            >
+            <Button onClick={() => setShowModal(true)} size="lg">
               Create First Project
             </Button>
           </div>
@@ -341,8 +385,16 @@ export default function AppDashboard() {
           <>
             <div className="flex items-center justify-between mb-8">
               <div>
-                <h1 className="text-2xl font-black" style={{ color: "var(--foreground)" }}>Your Projects</h1>
-                <p className="text-sm mt-1" style={{ color: "var(--muted-foreground)" }}>
+                <h1
+                  className="text-2xl font-black"
+                  style={{ color: "var(--foreground)" }}
+                >
+                  Your Projects
+                </h1>
+                <p
+                  className="text-sm mt-1"
+                  style={{ color: "var(--muted-foreground)" }}
+                >
                   {projects.length}{" "}
                   {projects.length === 1 ? "project" : "projects"}
                 </p>
@@ -362,7 +414,7 @@ export default function AppDashboard() {
                 className="flex flex-col items-center justify-center p-6 rounded-2xl border border-dashed transition-all duration-300 hover:-translate-y-1 min-h-[160px]"
                 style={{
                   borderColor: "var(--border)",
-                  color: "var(--muted-foreground)"
+                  color: "var(--muted-foreground)",
                 }}
               >
                 <span className="text-3xl mb-2">+</span>
@@ -373,12 +425,16 @@ export default function AppDashboard() {
         )}
       </main>
 
-      {showModal && <NewProjectModal onClose={() => setShowModal(false)} user={user} />}
+      {showModal && (
+        <NewProjectModal onClose={() => setShowModal(false)} user={user} />
+      )}
 
       {/* Delete confirmation modal */}
       <ConfirmModal
         isOpen={deleteConfirm.isOpen}
-        onClose={() => setDeleteConfirm({ isOpen: false, projectId: null, projectName: "" })}
+        onClose={() =>
+          setDeleteConfirm({ isOpen: false, projectId: null, projectName: "" })
+        }
         onConfirm={handleDelete}
         title="Delete Project"
         description={`Are you sure you want to delete "${deleteConfirm.projectName}"? This will permanently delete all tables, columns, and relationships. This action cannot be undone.`}

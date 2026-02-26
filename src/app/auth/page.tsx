@@ -1,17 +1,19 @@
-import { createFileRoute, Link } from "@tanstack/react-router";
+"use client";
+
+import Link from "next/link";
+import { useSearchParams } from "next/navigation";
 import { useEffect, useState } from "react";
 import { supabase } from "~/lib/supabase";
 import { ThemeToggle } from "~/components/ThemeToggle";
 import { Spinner } from "~/components/ui/spinner";
 import { FcGoogle } from "react-icons/fc";
-
-export const Route = createFileRoute("/auth")({
-  component: AuthPage,
-});
+import Image from "next/image";
 
 export default function AuthPage() {
   const [loading, setLoading] = useState(true);
   const [user, setUser] = useState<any>(null);
+  const searchParams = useSearchParams();
+  const redirectTo = searchParams.get("redirectTo") || "/app";
 
   useEffect(() => {
     // Check for existing session and handle OAuth callback
@@ -27,9 +29,9 @@ export default function AuthPage() {
         if (session && !error) {
           setUser(session.user);
 
-          // Clear the hash and redirect to app
-          window.history.replaceState(null, "", "/app");
-          window.location.href = "/app";
+          // Clear the hash and redirect to target
+          window.history.replaceState(null, "", redirectTo);
+          window.location.href = redirectTo;
           return;
         }
       } else {
@@ -55,12 +57,14 @@ export default function AuthPage() {
     });
 
     return () => subscription.unsubscribe();
-  }, []);
+  }, [redirectTo]);
 
   const handleGoogleSignIn = async () => {
-
     const { error } = await supabase.auth.signInWithOAuth({
       provider: "google",
+      options: {
+        redirectTo: `${window.location.origin}/auth?redirectTo=${encodeURIComponent(redirectTo)}`,
+      },
     });
 
     if (error) {
@@ -96,7 +100,7 @@ export default function AuthPage() {
           className="flex items-center justify-between px-6 py-4 border-b"
           style={{ borderColor: "var(--border)" }}
         >
-          <Link to="/" className="flex items-center gap-2">
+          <Link href="/" className="flex items-center gap-2">
             <div className="w-8 h-8 rounded-lg flex items-center justify-center">
               <span className="font-black text-sm">E</span>
             </div>
@@ -120,8 +124,11 @@ export default function AuthPage() {
               }}
             >
               {user.user_metadata?.avatar_url ? (
-                <img
+                <Image
                   src={user.user_metadata.avatar_url}
+                  width={1000}
+                  height={1000}
+                  priority
                   alt="Profile"
                   className="w-20 h-20 rounded-full"
                 />
@@ -141,7 +148,7 @@ export default function AuthPage() {
             </p>
 
             <Link
-              to="/app"
+              href="/app"
               className="block w-full py-3 rounded-xl font-medium transition-all hover:opacity-90 mb-3"
               style={{
                 background: "var(--primary)",
@@ -170,7 +177,7 @@ export default function AuthPage() {
           className="py-4 text-center text-xs"
           style={{ color: "var(--muted-foreground)" }}
         >
-          <Link to="/" className="hover:opacity-80">
+          <Link href="/" className="hover:opacity-80">
             ← Back to home
           </Link>
         </footer>
@@ -189,7 +196,7 @@ export default function AuthPage() {
         className="flex items-center justify-between px-6 py-4 border-b"
         style={{ borderColor: "var(--border)" }}
       >
-        <Link to="/" className="flex items-center gap-2">
+        <Link href="/" className="flex items-center gap-2">
           <div
             className="w-8 h-8 rounded-lg flex items-center justify-center"
             style={{

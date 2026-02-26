@@ -1,4 +1,12 @@
 import { Button } from "~/components/ui/button";
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogFooter,
+  DialogHeader,
+  DialogTitle,
+} from "~/components/ui/dialog";
 
 type ConfirmModalProps = {
   isOpen: boolean;
@@ -21,34 +29,14 @@ export function ConfirmModal({
   cancelText = "Cancel",
   variant = "default",
 }: ConfirmModalProps) {
-  if (!isOpen) return null;
-
   return (
-    <div
-      className="fixed inset-0 z-50 flex items-center justify-center p-4"
-      style={{ background: "rgba(0,0,0,0.8)", backdropFilter: "blur(8px)" }}
-      onClick={(e) => e.target === e.currentTarget && onClose()}
-    >
-      <div
-        className="w-full max-w-md rounded-2xl border overflow-hidden"
-        style={{ background: "var(--card)", borderColor: "var(--border)" }}
-      >
-        {/* Header */}
-        <div className="px-6 py-4 border-b" style={{ borderColor: "var(--border)" }}>
-          <h2 className="font-bold text-lg" style={{ color: "var(--card-foreground)" }}>
-            {title}
-          </h2>
-        </div>
-
-        {/* Content */}
-        <div className="px-6 py-4">
-          <p className="text-sm leading-relaxed" style={{ color: "var(--muted-foreground)" }}>
-            {description}
-          </p>
-        </div>
-
-        {/* Footer */}
-        <div className="px-6 py-4 border-t flex gap-3 justify-end" style={{ borderColor: "var(--border)" }}>
+    <Dialog open={isOpen} onOpenChange={onClose}>
+      <DialogContent className="sm:max-w-md">
+        <DialogHeader>
+          <DialogTitle>{title}</DialogTitle>
+          <DialogDescription>{description}</DialogDescription>
+        </DialogHeader>
+        <DialogFooter className="flex gap-3 sm:justify-end">
           <Button onClick={onClose} variant="outline">
             {cancelText}
           </Button>
@@ -61,8 +49,8 @@ export function ConfirmModal({
           >
             {confirmText}
           </Button>
-        </div>
-      </div>
-    </div>
+        </DialogFooter>
+      </DialogContent>
+    </Dialog>
   );
 }

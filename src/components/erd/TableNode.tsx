@@ -1,5 +1,11 @@
 import { memo, useState, useCallback } from "react";
 import { Handle, Position, NodeProps, useReactFlow } from "@xyflow/react";
+import { clsx, type ClassValue } from "clsx";
+import { twMerge } from "tailwind-merge";
+
+function cn(...inputs: ClassValue[]) {
+  return twMerge(clsx(inputs));
+}
 
 export type TableNodeData = {
   id: string;
@@ -59,17 +65,20 @@ export const TableNode = memo(({ data, selected }: NodeProps) => {
 
   return (
     <div
-      className="rounded-xl overflow-hidden transition-all duration-200"
-      style={{
-        minWidth: 220,
-        maxWidth: 280,
-        background: "var(--card)",
-        border: `1px solid ${selected ? color : hovered ? color + "60" : "var(--border)"}`,
-        boxShadow: selected
-          ? `0 0 0 2px ${color}40, 0 8px 32px rgba(0,0,0,0.4)`
+      className={cn(
+        "rounded-xl overflow-hidden transition-all duration-200 border min-w-[220px] max-w-[280px] bg-card",
+        selected
+          ? "shadow-[0_0_0_2px_rgba(var(--primary-rgb),0.4),0_8px_32px_rgba(0,0,0,0.4)]"
           : hovered
-            ? `0 4px 20px rgba(0,0,0,0.3)`
-            : `0 2px 8px rgba(0,0,0,0.2)`,
+            ? "shadow-[0_4px_20px_rgba(0,0,0,0.3)]"
+            : "shadow-[0_2px_8px_rgba(0,0,0,0.2)]",
+      )}
+      style={{
+        borderColor: selected
+          ? color
+          : hovered
+            ? color + "60"
+            : "var(--border)",
       }}
       onMouseEnter={() => setHovered(true)}
       onMouseLeave={() => setHovered(false)}
@@ -83,7 +92,7 @@ export const TableNode = memo(({ data, selected }: NodeProps) => {
         }}
       >
         <div
-          className="w-2.5 h-2.5 rounded-full flex-shrink-0"
+          className="w-2.5 h-2.5 rounded-full shrink-0"
           style={{ background: color, boxShadow: `0 0 6px ${color}80` }}
         />
         <span
@@ -97,18 +106,21 @@ export const TableNode = memo(({ data, selected }: NodeProps) => {
       {/* Columns */}
       <div>
         {columns.length === 0 ? (
-          <div className="px-3 py-3 text-xs italic text-center" style={{ color: "var(--muted-foreground)" }}>
+          <div className="px-3 py-3 text-xs italic text-center text-muted-foreground">
             No columns yet
           </div>
         ) : (
           columns.map((col, idx) => {
             // Check if this is a foreign key column (ends with _id)
-            const isForeignKey = col.name.endsWith('_id') && !col.isPrimary;
+            const isForeignKey = col.name.endsWith("_id") && !col.isPrimary;
 
             return (
-              <div key={col.id} className="relative table-node-column group/col">
+              <div
+                key={col.id}
+                className="relative table-node-column group/col"
+              >
                 {/* PK / FK / UQ badge */}
-                <div className="w-6 flex-shrink-0 flex items-center justify-center">
+                <div className="w-6 shrink-0 flex items-center justify-center">
                   {col.isPrimary ? (
                     <span className="text-yellow-400 text-[9px] font-black">
                       PK
@@ -118,19 +130,21 @@ export const TableNode = memo(({ data, selected }: NodeProps) => {
                       FK
                     </span>
                   ) : col.isUnique ? (
-                    <span className="text-purple-400 text-[9px] font-bold">UQ</span>
+                    <span className="text-purple-400 text-[9px] font-bold">
+                      UQ
+                    </span>
                   ) : (
-                    <span className="text-[9px]" style={{ color: "var(--muted-foreground)" }}>—</span>
+                    <span className="text-[9px] text-muted-foreground">—</span>
                   )}
                 </div>
 
                 {/* Required/Nullable indicator */}
-                <span className="text-[10px] mr-1" style={{ color: "var(--muted-foreground)" }}>
+                <span className="text-[10px] mr-1 text-muted-foreground">
                   {col.nullable ? "○" : "#"}
                 </span>
 
                 {/* Column name */}
-                <span className="flex-1 text-xs truncate" style={{ color: "var(--card-foreground)" }}>
+                <span className="flex-1 text-xs truncate text-card-foreground">
                   {col.name}
                 </span>
 

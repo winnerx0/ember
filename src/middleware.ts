@@ -1,6 +1,6 @@
-import { createMiddleware } from "@tanstack/react-start";
-import { redirect } from "@tanstack/react-router";
-import { createSupabaseServerClient } from "~/lib/supabase";
+import { createServerClient } from "@supabase/ssr";
+import { NextResponse } from "next/server";
+import type { NextRequest } from "next/server";
 
 const publicPaths = ["/", "/auth"];
 
@@ -8,31 +8,65 @@ function isPublicPath(pathname: string): boolean {
   return (
     publicPaths.includes(pathname) ||
     pathname.startsWith("/api") ||
-    pathname.startsWith("/assets") ||
-    pathname.includes("favicon")
+    pathname.startsWith("/_next") ||
+    pathname.includes("favicon") ||
+    pathname.includes(".")
   );
 }
 
-export const authMiddleware = createMiddleware().server(async ({ next, request }) => {
-  const { pathname } = new URL(request.url);
+export async function middleware(request: NextRequest) {
+  const { pathname } = request.nextUrl;
 
   if (isPublicPath(pathname)) {
-    return next();
+    return NextResponse.next();
   }
 
-  // Create server-side Supabase client with cookie handling
-  const supabase = createSupabaseServerClient(request);
+  let response = NextResponse.next({
+    request: {
+      headers: request.headers,
+    },
+  });
 
+  const supabase = createServerClient(
+    process.env.NEXT_PUBLIC_SUPABASE_URL!,
+    process.env.NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY!,
+    {
+      cookies: {
+        getAll() {
+          return request.cookies.getAll();
+        },
+        setAll(cookiesToSet) {
+          cookiesToSet.forEach(({ name, value }) =>
+            request.cookies.set(name, value),
+          );
+          response = NextResponse.next({
+            request: {
+              headers: request.headers,
+            },
+          });
+          cookiesToSet.forEach(({ name, value, options }) =>
+            response.cookies.set(name, value, options),
+          );
+        },
+      },
+    },
+  );
+
+  // Check for session
   const {
-    data: { session },
-  } = await supabase.auth.getSession();
+    data: { user },
+  } = await supabase.auth.getUser();
 
-  if (!session) {
-    throw redirect({
-      to: "/auth",
-      search: { redirectTo: pathname },
-    });
+  if (!user) {
+    const url = request.nextUrl.clone();
+    url.pathname = "/auth";
+    url.searchParams.set("redirectTo", pathname);
+    return NextResponse.redirect(url);
   }
 
-  return next();
-});
+  return response;
+}
+
+export const config = {
+  matcher: ["/((?!_next/static|_next/image|favicon.ico).*)"],
+};

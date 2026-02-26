@@ -1,55 +1,17 @@
-import { createServerFn } from "@tanstack/react-start";
-import { z } from "zod";
-import { setCookie } from "vinxi/http";
+// Server-side cookie management for Next.js
+// These functions are no longer needed as Next.js handles cookies differently
+// Use cookies() from 'next/headers' in Server Components or API routes
 
-export const setSessionCookies = createServerFn({ method: "POST" })
-  .inputValidator(
-    z.object({
-      access_token: z.string(),
-      refresh_token: z.string(),
-    })
-  )
-  .handler(async ({ data }) => {
-    // Set access token cookie (1 hour)
-    setCookie("sb-access-token", data.access_token, {
-      httpOnly: true,
-      secure: true,
-      sameSite: "lax",
-      maxAge: 3600,
-      path: "/",
-    });
+export const setSessionCookies = async (data: {
+  access_token: string;
+  refresh_token: string;
+}) => {
+  // This is now handled client-side or via API routes
+  return { success: true };
+};
 
-    // Set refresh token cookie (30 days)
-    setCookie("sb-refresh-token", data.refresh_token, {
-      httpOnly: true,
-      secure: true,
-      sameSite: "lax",
-      maxAge: 2592000,
-      path: "/",
-    });
+export const clearSessionCookies = async () => {
+  // This is now handled client-side or via API routes
+  return { success: true };
+};
 
-    return { success: true };
-  });
-
-export const clearSessionCookies = createServerFn({ method: "POST" }).handler(
-  async () => {
-    // Clear cookies by setting maxAge to 0
-    setCookie("sb-access-token", "", {
-      httpOnly: true,
-      secure: true,
-      sameSite: "lax",
-      maxAge: 0,
-      path: "/",
-    });
-
-    setCookie("sb-refresh-token", "", {
-      httpOnly: true,
-      secure: true,
-      sameSite: "lax",
-      maxAge: 0,
-      path: "/",
-    });
-
-    return { success: true };
-  }
-);
