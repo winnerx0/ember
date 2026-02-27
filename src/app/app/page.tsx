@@ -1,6 +1,7 @@
 "use client";
 
 import Link from "next/link";
+import Image from "next/image";
 import { useState } from "react";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { getProjects, createProject, deleteProject } from "~/server/projects";
@@ -317,15 +318,13 @@ export default function AppDashboard() {
             href="/"
             className="flex items-center gap-2 hover:opacity-80 transition-opacity"
           >
-            <div
-              className="w-7 h-7 rounded-lg flex items-center justify-center"
-              style={{
-                background: "var(--primary)",
-                color: "var(--primary-foreground)",
-              }}
-            >
-              <span className="font-black text-xs">E</span>
-            </div>
+            <Image
+              src="/logo.jpg"
+              alt="Ember Logo"
+              width={28}
+              height={28}
+              className="rounded-lg object-cover"
+            />
             <span
               className="font-bold text-sm"
               style={{ color: "var(--foreground)" }}

@@ -1,5 +1,6 @@
 "use client";
 import Link from "next/link";
+import Image from "next/image";
 import {
   ReactFlow,
   Background,
@@ -51,10 +52,10 @@ const edgeTypes = { relationship: RelationshipEdge };
 
 const TABLE_COLORS = [
   "oklch(0.488 0.243 264.376)", // Blue/Purple - dark mode chart-1
-  "oklch(0.696 0.17 162.48)",   // Teal - dark mode chart-2
-  "oklch(0.769 0.188 70.08)",   // Green - dark mode chart-3
-  "oklch(0.627 0.265 303.9)",   // Purple - dark mode chart-4
-  "oklch(0.645 0.246 16.439)",  // Orange - dark mode chart-5
+  "oklch(0.696 0.17 162.48)", // Teal - dark mode chart-2
+  "oklch(0.769 0.188 70.08)", // Green - dark mode chart-3
+  "oklch(0.627 0.265 303.9)", // Purple - dark mode chart-4
+  "oklch(0.645 0.246 16.439)", // Orange - dark mode chart-5
 ];
 
 function ERDCanvas({ params }: { params: { projectId: string } }) {
@@ -96,13 +97,13 @@ function ERDCanvas({ params }: { params: { projectId: string } }) {
   useEffect(() => {
     if (initialLoadDone.current && (nodes.length > 0 || edges.length > 0)) {
       const data = {
-        nodes: nodes.map(n => ({
+        nodes: nodes.map((n) => ({
           id: n.id,
           type: n.type,
           position: n.position,
           data: n.data,
         })),
-        edges: edges.map(e => ({
+        edges: edges.map((e) => ({
           id: e.id,
           source: e.source,
           target: e.target,
@@ -183,9 +184,9 @@ function ERDCanvas({ params }: { params: { projectId: string } }) {
       }
 
       localStorage.setItem(LAST_SYNC_KEY, Date.now().toString());
-      console.log('Synced to database at', new Date().toLocaleTimeString());
+      console.log("Synced to database at", new Date().toLocaleTimeString());
     } catch (error) {
-      console.error('Failed to sync to database:', error);
+      console.error("Failed to sync to database:", error);
     } finally {
       setSaving(false);
     }
@@ -208,7 +209,7 @@ function ERDCanvas({ params }: { params: { projectId: string } }) {
 
           // Use localStorage data if it's newer than last sync
           if (storedTime > lastSyncTime) {
-            console.log('Loading from localStorage (unsaved changes detected)');
+            console.log("Loading from localStorage (unsaved changes detected)");
             setNodes(data.nodes || []);
             setEdges(data.edges || []);
             // Sync immediately if there are unsaved changes
@@ -216,12 +217,12 @@ function ERDCanvas({ params }: { params: { projectId: string } }) {
             return;
           }
         } catch (error) {
-          console.error('Failed to parse localStorage data:', error);
+          console.error("Failed to parse localStorage data:", error);
         }
       }
 
       // Load from database
-      console.log('Loading from database');
+      console.log("Loading from database");
       const dbNodes: Node[] = project.tables.map((table: any) => ({
         id: table.id,
         type: "tableNode",
@@ -253,14 +254,25 @@ function ERDCanvas({ params }: { params: { projectId: string } }) {
       setEdges(dbEdges);
 
       // Save to localStorage after loading from DB
-      localStorage.setItem(STORAGE_KEY, JSON.stringify({
-        nodes: dbNodes,
-        edges: dbEdges,
-        timestamp: Date.now(),
-      }));
+      localStorage.setItem(
+        STORAGE_KEY,
+        JSON.stringify({
+          nodes: dbNodes,
+          edges: dbEdges,
+          timestamp: Date.now(),
+        }),
+      );
       localStorage.setItem(LAST_SYNC_KEY, Date.now().toString());
     }
-  }, [project, projectId, setNodes, setEdges, STORAGE_KEY, LAST_SYNC_KEY, syncToDatabase]);
+  }, [
+    project,
+    projectId,
+    setNodes,
+    setEdges,
+    STORAGE_KEY,
+    LAST_SYNC_KEY,
+    syncToDatabase,
+  ]);
 
   // Setup periodic sync every 5 minutes
   useEffect(() => {
@@ -275,13 +287,13 @@ function ERDCanvas({ params }: { params: { projectId: string } }) {
     const handleBeforeUnload = () => {
       syncToDatabase();
     };
-    window.addEventListener('beforeunload', handleBeforeUnload);
+    window.addEventListener("beforeunload", handleBeforeUnload);
 
     return () => {
       if (syncTimer.current) {
         clearInterval(syncTimer.current);
       }
-      window.removeEventListener('beforeunload', handleBeforeUnload);
+      window.removeEventListener("beforeunload", handleBeforeUnload);
     };
   }, [syncToDatabase]);
 
@@ -633,13 +645,10 @@ function ERDCanvas({ params }: { params: { projectId: string } }) {
   }, [projectId, nodes, setNodes]);
 
   // Debounced position save - now just updates localStorage
-  const scheduleSave = useCallback(
-    (updatedNodes: Node[]) => {
-      // Position changes are already saved to localStorage via the useEffect
-      // No need for debounced save anymore
-    },
-    [],
-  );
+  const scheduleSave = useCallback((updatedNodes: Node[]) => {
+    // Position changes are already saved to localStorage via the useEffect
+    // No need for debounced save anymore
+  }, []);
 
   const handleNodesChange = useCallback(
     (changes: any) => {
@@ -894,354 +903,356 @@ function ERDCanvas({ params }: { params: { projectId: string } }) {
     [projectId, setEdges, edges, nodes, setNodes, queryClient],
   );
 
-
-
   // Update edge type — also moves FK column to the correct table
   const handleUpdateEdgeType = useCallback(
-      async (
-        edgeId: string,
-        newType: "one-to-one" | "one-to-many" | "many-to-one" | "many-to-many",
-      ) => {
-        const edge = edges.find((e) => e.id === edgeId);
-        if (!edge) return;
+    async (
+      edgeId: string,
+      newType: "one-to-one" | "one-to-many" | "many-to-one" | "many-to-many",
+    ) => {
+      const edge = edges.find((e) => e.id === edgeId);
+      if (!edge) return;
 
-        const oldType = (edge.data as any)?.type || "one-to-many";
+      const oldType = (edge.data as any)?.type || "one-to-many";
 
-        // Determine which table currently has the FK column and which should have it
-        // "many" side holds the FK. For one-to-one and one-to-many, FK is on target.
-        const oldFKSide =
-          oldType === "many-to-one"
-            ? "source"
-            : oldType === "many-to-many"
-              ? "none"
-              : "target";
-        const newFKSide =
-          newType === "many-to-one"
-            ? "source"
-            : newType === "many-to-many"
-              ? "none"
-              : "target";
+      // Determine which table currently has the FK column and which should have it
+      // "many" side holds the FK. For one-to-one and one-to-many, FK is on target.
+      const oldFKSide =
+        oldType === "many-to-one"
+          ? "source"
+          : oldType === "many-to-many"
+            ? "none"
+            : "target";
+      const newFKSide =
+        newType === "many-to-one"
+          ? "source"
+          : newType === "many-to-many"
+            ? "none"
+            : "target";
 
-        // Store original state for potential revert
-        const originalEdge = { ...edge };
+      // Store original state for potential revert
+      const originalEdge = { ...edge };
 
-        // OPTIMISTIC UPDATE: Update the edge type in UI
-        setEdges((eds) =>
-          eds.map((e) =>
-            e.id === edgeId ? { ...e, data: { ...e.data, type: newType } } : e,
-          ),
-        );
+      // OPTIMISTIC UPDATE: Update the edge type in UI
+      setEdges((eds) =>
+        eds.map((e) =>
+          e.id === edgeId ? { ...e, data: { ...e.data, type: newType } } : e,
+        ),
+      );
 
-        // Handle FK column changes
-        if (edge.source && edge.target) {
-          const sourceNode = nodes.find((n) => n.id === edge.source);
-          const targetNode = nodes.find((n) => n.id === edge.target);
+      // Handle FK column changes
+      if (edge.source && edge.target) {
+        const sourceNode = nodes.find((n) => n.id === edge.source);
+        const targetNode = nodes.find((n) => n.id === edge.target);
 
-          if (sourceNode && targetNode) {
-            const sourceData = sourceNode.data as TableNodeData;
-            const targetData = targetNode.data as TableNodeData;
-            const sourcePK = sourceData.columns?.find((col) => col.isPrimary);
-            const targetPK = targetData.columns?.find((col) => col.isPrimary);
+        if (sourceNode && targetNode) {
+          const sourceData = sourceNode.data as TableNodeData;
+          const targetData = targetNode.data as TableNodeData;
+          const sourcePK = sourceData.columns?.find((col) => col.isPrimary);
+          const targetPK = targetData.columns?.find((col) => col.isPrimary);
 
-            // FK column names
-            const sourceFKName = `${sourceData.name}_id`;
-            const targetFKName = `${targetData.name}_id`;
+          // FK column names
+          const sourceFKName = `${sourceData.name}_id`;
+          const targetFKName = `${targetData.name}_id`;
 
-            // Track the new column IDs for the relationship
-            let newSourceColumnId = sourcePK?.id;
-            let newTargetColumnId = targetPK?.id;
+          // Track the new column IDs for the relationship
+          let newSourceColumnId = sourcePK?.id;
+          let newTargetColumnId = targetPK?.id;
 
-            // Store original columns for potential revert
-            const originalSourceColumns = [...(sourceData.columns || [])];
-            const originalTargetColumns = [...(targetData.columns || [])];
+          // Store original columns for potential revert
+          const originalSourceColumns = [...(sourceData.columns || [])];
+          const originalTargetColumns = [...(targetData.columns || [])];
 
-            try {
-              // STEP 1: Add new FK column if needed (before removing old one)
-              if (newFKSide === "none") {
-                // Many-to-many: use primary keys from both tables
-                newSourceColumnId = sourcePK?.id;
-                newTargetColumnId = targetPK?.id;
-              } else if (newFKSide === "source") {
-                // Add FK to source table (many-to-one: source references target)
-                const fkExists = (sourceData.columns || []).some(
-                  (col) => col.name === targetFKName,
-                );
-                if (!fkExists) {
-                  const newFKId = crypto.randomUUID();
-                  const updatedColumns = [
-                    ...(sourceData.columns || []).filter(
-                      (col) => col.name !== targetFKName,
-                    ),
-                    {
-                      id: newFKId,
-                      name: targetFKName,
-                      type: targetPK?.type || "uuid",
-                      isPrimary: false,
-                      isUnique: false,
-                      nullable: false,
-                      defaultValue: null,
-                      order: (sourceData.columns || []).length,
-                    },
-                  ];
-
-                  // OPTIMISTIC UPDATE: Add FK column to source table
-                  setNodes((nds) =>
-                    nds.map((n) =>
-                      n.id === edge.source
-                        ? {
-                            ...n,
-                            data: { ...n.data, columns: [...updatedColumns] },
-                          }
-                        : n,
-                    ),
-                  );
-
-                  await saveColumns({
-                    data: {
-                      tableId: edge.source,
-                      projectId,
-                      columns: updatedColumns.map((c, i) => ({
-                        id: c.id,
-                        name: c.name,
-                        type: c.type,
-                        nullable: c.nullable,
-                        isPrimary: c.isPrimary,
-                        isUnique: c.isUnique,
-                        defaultValue: c.defaultValue || undefined,
-                        order: i,
-                      })),
-                    },
-                  });
-                  // For many-to-one: source column is the FK, target column is the PK
-                  newSourceColumnId = newFKId;
-                  newTargetColumnId = targetPK?.id;
-                } else {
-                  // FK already exists, find its ID
-                  const existingFK = (sourceData.columns || []).find(
-                    (col) => col.name === targetFKName,
-                  );
-                  newSourceColumnId = existingFK?.id;
-                  newTargetColumnId = targetPK?.id;
-                }
-              } else if (newFKSide === "target") {
-                // Add FK to target table (one-to-many or one-to-one: target references source)
-                const fkExists = (targetData.columns || []).some(
-                  (col) => col.name === sourceFKName,
-                );
-                if (!fkExists) {
-                  const newFKId = crypto.randomUUID();
-                  const updatedColumns = [
-                    ...(targetData.columns || []).filter(
-                      (col) => col.name !== sourceFKName,
-                    ),
-                    {
-                      id: newFKId,
-                      name: sourceFKName,
-                      type: sourcePK?.type || "uuid",
-                      isPrimary: false,
-                      isUnique: false,
-                      nullable: false,
-                      defaultValue: null,
-                      order: (targetData.columns || []).length,
-                    },
-                  ];
-
-                  // OPTIMISTIC UPDATE: Add FK column to target table
-                  setNodes((nds) =>
-                    nds.map((n) =>
-                      n.id === edge.target
-                        ? {
-                            ...n,
-                            data: { ...n.data, columns: [...updatedColumns] },
-                          }
-                        : n,
-                    ),
-                  );
-
-                  await saveColumns({
-                    data: {
-                      tableId: edge.target,
-                      projectId,
-                      columns: updatedColumns.map((c, i) => ({
-                        id: c.id,
-                        name: c.name,
-                        type: c.type,
-                        nullable: c.nullable,
-                        isPrimary: c.isPrimary,
-                        isUnique: c.isUnique,
-                        defaultValue: c.defaultValue || undefined,
-                        order: i,
-                      })),
-                    },
-                  });
-                  // For one-to-many/one-to-one: source has PK, target has FK
-                  newSourceColumnId = sourcePK?.id;
-                  newTargetColumnId = newFKId;
-                } else {
-                  // FK already exists, find its ID
-                  const existingFK = (targetData.columns || []).find(
-                    (col) => col.name === sourceFKName,
-                  );
-                  newSourceColumnId = sourcePK?.id;
-                  newTargetColumnId = existingFK?.id;
-                }
-              }
-
-              // STEP 2: Update the relationship with new column IDs BEFORE deleting old FK
-              // This prevents CASCADE delete from removing the relationship
-              if (!newSourceColumnId || !newTargetColumnId) {
-                console.error("Missing column IDs for relationship update", {
-                  newSourceColumnId,
-                  newTargetColumnId,
-                  newType,
-                  sourcePK,
-                  targetPK,
-                });
-                throw new Error("Missing column IDs for relationship update");
-              }
-
-              await updateRelationship({
-                data: {
-                  id: edgeId,
-                  projectId,
-                  type: newType,
-                  sourceColumnId: newSourceColumnId,
-                  targetColumnId: newTargetColumnId,
-                },
-              });
-
-              // STEP 3: Now safe to remove old FK column
-              if (oldFKSide === "source" && newFKSide !== "source") {
-                // Remove FK from source table - get fresh data
-                setNodes((nds) => {
-                  const freshSourceNode = nds.find((n) => n.id === edge.source);
-                  if (!freshSourceNode) return nds;
-
-                  const freshSourceData = freshSourceNode.data as TableNodeData;
-                  const columnsWithoutFK = (freshSourceData.columns || []).filter(
+          try {
+            // STEP 1: Add new FK column if needed (before removing old one)
+            if (newFKSide === "none") {
+              // Many-to-many: use primary keys from both tables
+              newSourceColumnId = sourcePK?.id;
+              newTargetColumnId = targetPK?.id;
+            } else if (newFKSide === "source") {
+              // Add FK to source table (many-to-one: source references target)
+              const fkExists = (sourceData.columns || []).some(
+                (col) => col.name === targetFKName,
+              );
+              if (!fkExists) {
+                const newFKId = crypto.randomUUID();
+                const updatedColumns = [
+                  ...(sourceData.columns || []).filter(
                     (col) => col.name !== targetFKName,
-                  );
+                  ),
+                  {
+                    id: newFKId,
+                    name: targetFKName,
+                    type: targetPK?.type || "uuid",
+                    isPrimary: false,
+                    isUnique: false,
+                    nullable: false,
+                    defaultValue: null,
+                    order: (sourceData.columns || []).length,
+                  },
+                ];
 
-                  // Save to database
-                  saveColumns({
-                    data: {
-                      tableId: edge.source,
-                      projectId,
-                      columns: columnsWithoutFK.map((c, i) => ({
-                        id: c.id,
-                        name: c.name,
-                        type: c.type,
-                        nullable: c.nullable,
-                        isPrimary: c.isPrimary,
-                        isUnique: c.isUnique,
-                        defaultValue: c.defaultValue || undefined,
-                        order: i,
-                      })),
-                    },
-                  }).catch((error) => {
-                    console.error("Failed to remove old FK from source:", error);
-                  });
-
-                  return nds.map((n) =>
+                // OPTIMISTIC UPDATE: Add FK column to source table
+                setNodes((nds) =>
+                  nds.map((n) =>
                     n.id === edge.source
                       ? {
                           ...n,
-                          data: { ...n.data, columns: columnsWithoutFK },
+                          data: { ...n.data, columns: [...updatedColumns] },
                         }
                       : n,
-                  );
+                  ),
+                );
+
+                await saveColumns({
+                  data: {
+                    tableId: edge.source,
+                    projectId,
+                    columns: updatedColumns.map((c, i) => ({
+                      id: c.id,
+                      name: c.name,
+                      type: c.type,
+                      nullable: c.nullable,
+                      isPrimary: c.isPrimary,
+                      isUnique: c.isUnique,
+                      defaultValue: c.defaultValue || undefined,
+                      order: i,
+                    })),
+                  },
                 });
-              } else if (oldFKSide === "target" && newFKSide !== "target") {
-                // Remove FK from target table - get fresh data
-                setNodes((nds) => {
-                  const freshTargetNode = nds.find((n) => n.id === edge.target);
-                  if (!freshTargetNode) return nds;
-
-                  const freshTargetData = freshTargetNode.data as TableNodeData;
-                  const columnsWithoutFK = (freshTargetData.columns || []).filter(
+                // For many-to-one: source column is the FK, target column is the PK
+                newSourceColumnId = newFKId;
+                newTargetColumnId = targetPK?.id;
+              } else {
+                // FK already exists, find its ID
+                const existingFK = (sourceData.columns || []).find(
+                  (col) => col.name === targetFKName,
+                );
+                newSourceColumnId = existingFK?.id;
+                newTargetColumnId = targetPK?.id;
+              }
+            } else if (newFKSide === "target") {
+              // Add FK to target table (one-to-many or one-to-one: target references source)
+              const fkExists = (targetData.columns || []).some(
+                (col) => col.name === sourceFKName,
+              );
+              if (!fkExists) {
+                const newFKId = crypto.randomUUID();
+                const updatedColumns = [
+                  ...(targetData.columns || []).filter(
                     (col) => col.name !== sourceFKName,
-                  );
+                  ),
+                  {
+                    id: newFKId,
+                    name: sourceFKName,
+                    type: sourcePK?.type || "uuid",
+                    isPrimary: false,
+                    isUnique: false,
+                    nullable: false,
+                    defaultValue: null,
+                    order: (targetData.columns || []).length,
+                  },
+                ];
 
-                  // Save to database
-                  saveColumns({
-                    data: {
-                      tableId: edge.target,
-                      projectId,
-                      columns: columnsWithoutFK.map((c, i) => ({
-                        id: c.id,
-                        name: c.name,
-                        type: c.type,
-                        nullable: c.nullable,
-                        isPrimary: c.isPrimary,
-                        isUnique: c.isUnique,
-                        defaultValue: c.defaultValue || undefined,
-                        order: i,
-                      })),
-                    },
-                  }).catch((error) => {
-                    console.error("Failed to remove old FK from target:", error);
-                  });
-
-                  return nds.map((n) =>
+                // OPTIMISTIC UPDATE: Add FK column to target table
+                setNodes((nds) =>
+                  nds.map((n) =>
                     n.id === edge.target
                       ? {
                           ...n,
-                          data: { ...n.data, columns: columnsWithoutFK },
+                          data: { ...n.data, columns: [...updatedColumns] },
                         }
                       : n,
-                  );
-                });
-              }
-            } catch (error) {
-              console.error("Failed to update relationship type:", error);
-              toast.error("Failed to update relationship type");
+                  ),
+                );
 
-              // REVERT: Restore original edge type and columns
-              setEdges((eds) =>
-                eds.map((e) =>
-                  e.id === edgeId ? { ...e, data: { ...e.data, type: oldType } } : e,
-                ),
-              );
-              setNodes((nds) =>
-                nds.map((n) => {
-                  if (n.id === edge.source) {
-                    return {
-                      ...n,
-                      data: { ...n.data, columns: originalSourceColumns },
-                    };
-                  }
-                  if (n.id === edge.target) {
-                    return {
-                      ...n,
-                      data: { ...n.data, columns: originalTargetColumns },
-                    };
-                  }
-                  return n;
-                }),
-              );
+                await saveColumns({
+                  data: {
+                    tableId: edge.target,
+                    projectId,
+                    columns: updatedColumns.map((c, i) => ({
+                      id: c.id,
+                      name: c.name,
+                      type: c.type,
+                      nullable: c.nullable,
+                      isPrimary: c.isPrimary,
+                      isUnique: c.isUnique,
+                      defaultValue: c.defaultValue || undefined,
+                      order: i,
+                    })),
+                  },
+                });
+                // For one-to-many/one-to-one: source has PK, target has FK
+                newSourceColumnId = sourcePK?.id;
+                newTargetColumnId = newFKId;
+              } else {
+                // FK already exists, find its ID
+                const existingFK = (targetData.columns || []).find(
+                  (col) => col.name === sourceFKName,
+                );
+                newSourceColumnId = sourcePK?.id;
+                newTargetColumnId = existingFK?.id;
+              }
             }
-          }
-        } else {
-          // No column changes needed, just update the type
-          try {
+
+            // STEP 2: Update the relationship with new column IDs BEFORE deleting old FK
+            // This prevents CASCADE delete from removing the relationship
+            if (!newSourceColumnId || !newTargetColumnId) {
+              console.error("Missing column IDs for relationship update", {
+                newSourceColumnId,
+                newTargetColumnId,
+                newType,
+                sourcePK,
+                targetPK,
+              });
+              throw new Error("Missing column IDs for relationship update");
+            }
+
             await updateRelationship({
-              data: { id: edgeId, projectId, type: newType },
+              data: {
+                id: edgeId,
+                projectId,
+                type: newType,
+                sourceColumnId: newSourceColumnId,
+                targetColumnId: newTargetColumnId,
+              },
             });
+
+            // STEP 3: Now safe to remove old FK column
+            if (oldFKSide === "source" && newFKSide !== "source") {
+              // Remove FK from source table - get fresh data
+              setNodes((nds) => {
+                const freshSourceNode = nds.find((n) => n.id === edge.source);
+                if (!freshSourceNode) return nds;
+
+                const freshSourceData = freshSourceNode.data as TableNodeData;
+                const columnsWithoutFK = (freshSourceData.columns || []).filter(
+                  (col) => col.name !== targetFKName,
+                );
+
+                // Save to database
+                saveColumns({
+                  data: {
+                    tableId: edge.source,
+                    projectId,
+                    columns: columnsWithoutFK.map((c, i) => ({
+                      id: c.id,
+                      name: c.name,
+                      type: c.type,
+                      nullable: c.nullable,
+                      isPrimary: c.isPrimary,
+                      isUnique: c.isUnique,
+                      defaultValue: c.defaultValue || undefined,
+                      order: i,
+                    })),
+                  },
+                }).catch((error) => {
+                  console.error("Failed to remove old FK from source:", error);
+                });
+
+                return nds.map((n) =>
+                  n.id === edge.source
+                    ? {
+                        ...n,
+                        data: { ...n.data, columns: columnsWithoutFK },
+                      }
+                    : n,
+                );
+              });
+            } else if (oldFKSide === "target" && newFKSide !== "target") {
+              // Remove FK from target table - get fresh data
+              setNodes((nds) => {
+                const freshTargetNode = nds.find((n) => n.id === edge.target);
+                if (!freshTargetNode) return nds;
+
+                const freshTargetData = freshTargetNode.data as TableNodeData;
+                const columnsWithoutFK = (freshTargetData.columns || []).filter(
+                  (col) => col.name !== sourceFKName,
+                );
+
+                // Save to database
+                saveColumns({
+                  data: {
+                    tableId: edge.target,
+                    projectId,
+                    columns: columnsWithoutFK.map((c, i) => ({
+                      id: c.id,
+                      name: c.name,
+                      type: c.type,
+                      nullable: c.nullable,
+                      isPrimary: c.isPrimary,
+                      isUnique: c.isUnique,
+                      defaultValue: c.defaultValue || undefined,
+                      order: i,
+                    })),
+                  },
+                }).catch((error) => {
+                  console.error("Failed to remove old FK from target:", error);
+                });
+
+                return nds.map((n) =>
+                  n.id === edge.target
+                    ? {
+                        ...n,
+                        data: { ...n.data, columns: columnsWithoutFK },
+                      }
+                    : n,
+                );
+              });
+            }
           } catch (error) {
             console.error("Failed to update relationship type:", error);
             toast.error("Failed to update relationship type");
 
-            // REVERT: Restore original edge type
+            // REVERT: Restore original edge type and columns
             setEdges((eds) =>
               eds.map((e) =>
-                e.id === edgeId ? { ...e, data: { ...e.data, type: oldType } } : e,
+                e.id === edgeId
+                  ? { ...e, data: { ...e.data, type: oldType } }
+                  : e,
               ),
+            );
+            setNodes((nds) =>
+              nds.map((n) => {
+                if (n.id === edge.source) {
+                  return {
+                    ...n,
+                    data: { ...n.data, columns: originalSourceColumns },
+                  };
+                }
+                if (n.id === edge.target) {
+                  return {
+                    ...n,
+                    data: { ...n.data, columns: originalTargetColumns },
+                  };
+                }
+                return n;
+              }),
             );
           }
         }
-      },
-      [projectId, setEdges, edges, nodes, setNodes, queryClient],
-    );
+      } else {
+        // No column changes needed, just update the type
+        try {
+          await updateRelationship({
+            data: { id: edgeId, projectId, type: newType },
+          });
+        } catch (error) {
+          console.error("Failed to update relationship type:", error);
+          toast.error("Failed to update relationship type");
+
+          // REVERT: Restore original edge type
+          setEdges((eds) =>
+            eds.map((e) =>
+              e.id === edgeId
+                ? { ...e, data: { ...e.data, type: oldType } }
+                : e,
+            ),
+          );
+        }
+      }
+    },
+    [projectId, setEdges, edges, nodes, setNodes, queryClient],
+  );
 
   // Update edges to include delete and type change handlers
   const edgesWithHandlers = edges.map((e) => ({
@@ -1327,7 +1338,9 @@ function ERDCanvas({ params }: { params: { projectId: string } }) {
 
     // Get the table being deleted to find its name
     const deletedTable = nodes.find((n) => n.id === tableId);
-    const deletedTableName = deletedTable ? (deletedTable.data as TableNodeData).name : null;
+    const deletedTableName = deletedTable
+      ? (deletedTable.data as TableNodeData).name
+      : null;
 
     // Find all tables that have FK columns referencing the deleted table
     const fkColumnName = deletedTableName ? `${deletedTableName}_id` : null;
@@ -1350,12 +1363,15 @@ function ERDCanvas({ params }: { params: { projectId: string } }) {
               ...n,
               data: {
                 ...n.data,
-                columns: tableData.columns?.filter((col) => col.name !== fkColumnName) || [],
+                columns:
+                  tableData.columns?.filter(
+                    (col) => col.name !== fkColumnName,
+                  ) || [],
               },
             };
           }
           return n;
-        })
+        }),
     );
 
     // Remove relationships
@@ -1371,9 +1387,8 @@ function ERDCanvas({ params }: { params: { projectId: string } }) {
       // Remove FK columns from affected tables
       for (const affectedTable of affectedTables) {
         const tableData = affectedTable.data as TableNodeData;
-        const updatedColumns = tableData.columns?.filter(
-          (col) => col.name !== fkColumnName
-        ) || [];
+        const updatedColumns =
+          tableData.columns?.filter((col) => col.name !== fkColumnName) || [];
 
         await saveColumns({
           data: {
@@ -1541,191 +1556,197 @@ function ERDCanvas({ params }: { params: { projectId: string } }) {
   return (
     <div className="flex h-screen overflow-hidden bg-background">
       {/* Left sidebar */}
-      <div className={clsx(
-        "shrink-0 flex flex-col border-r bg-card border-border transition-all duration-300",
-        sidebarOpen ? "w-56" : "w-0 border-r-0"
-      )}>
+      <div
+        className={clsx(
+          "shrink-0 flex flex-col border-r bg-card border-border transition-all duration-300",
+          sidebarOpen ? "w-56" : "w-0 border-r-0",
+        )}
+      >
         <div className={clsx("w-56", !sidebarOpen && "hidden")}>
-        {/* Logo */}
-        <div className="px-4 py-3 border-b flex items-center justify-between border-border">
-          <Link
-            href="/app"
-            className="flex items-center gap-2 hover:opacity-80 transition-opacity"
-          >
-            <div className="w-6 h-6 rounded flex items-center justify-center bg-primary text-primary-foreground">
-              <span className="font-black text-[10px]">E</span>
-            </div>
-            <span className="text-xs font-medium text-muted-foreground">
-              Projects
-            </span>
-          </Link>
-          <div className="flex items-center gap-2">
-            <ThemeToggle />
-            <button
-              onClick={() => setSidebarOpen(false)}
-              className="p-1 hover:bg-accent rounded transition-colors"
-              title="Close sidebar"
+          {/* Logo */}
+          <div className="px-4 py-3 border-b flex items-center justify-between border-border">
+            <Link
+              href="/app"
+              className="flex items-center gap-2 hover:opacity-80 transition-opacity"
             >
-              <svg
-                xmlns="http://www.w3.org/2000/svg"
-                width="16"
-                height="16"
-                viewBox="0 0 24 24"
-                fill="none"
-                stroke="currentColor"
-                strokeWidth="2"
-                strokeLinecap="round"
-                strokeLinejoin="round"
-              >
-                <path d="m11 17-5-5 5-5" />
-                <path d="m18 17-5-5 5-5" />
-              </svg>
-            </button>
-          </div>
-        </div>
-
-        {/* Project name */}
-        <div className="px-4 py-3">
-          <p className="text-[10px] uppercase tracking-wider mb-1 text-muted-foreground">
-            Project
-          </p>
-          <p className="text-sm font-bold truncate text-card-foreground">
-            {project.name}
-          </p>
-          {project.description && (
-            <p className="text-xs mt-0.5 truncate text-muted-foreground">
-              {project.description}
-            </p>
-          )}
-        </div>
-
-        {/* Tables list */}
-        <div className="flex-1 overflow-y-auto p-3">
-          <div className="flex items-center justify-between mb-2">
-            <p className="text-[10px] uppercase tracking-wider text-muted-foreground">
-              Tables ({nodes.length})
-            </p>
-          </div>
-          <div className="space-y-1">
-            {nodes.map((n) => {
-              const d = n.data as TableNodeData;
-              return (
-                <div
-                  key={n.id}
-                  className={clsx(
-                    "group flex items-center gap-2 rounded-lg transition-all border",
-                    selectedTableId === n.id
-                      ? "bg-accent border-border"
-                      : "bg-transparent border-transparent",
-                  )}
-                >
-                  <button
-                    onClick={() => setSelectedTableId(n.id)}
-                    className="flex-1 flex items-center gap-2 px-2.5 py-2 text-left"
-                  >
-                    <div
-                      className="w-2 h-2 rounded-full shrink-0"
-                      style={{ background: d.color }}
-                    />
-                    <span className="text-xs truncate flex-1 text-foreground">
-                      {d.name}
-                    </span>
-                    <span className="text-[10px] text-muted-foreground">
-                      {d.columns?.length || 0}
-                    </span>
-                  </button>
-                  <button
-                    onClick={(e) => {
-                      e.stopPropagation();
-                      handleDeleteTable(n.id);
-                    }}
-                    className="px-2 py-2 opacity-0 group-hover:opacity-100 transition-opacity text-red-400 hover:text-red-300"
-                    title="Delete table"
-                  >
-                    <svg
-                      xmlns="http://www.w3.org/2000/svg"
-                      width="14"
-                      height="14"
-                      viewBox="0 0 24 24"
-                      fill="none"
-                      stroke="currentColor"
-                      strokeWidth="2"
-                      strokeLinecap="round"
-                      strokeLinejoin="round"
-                    >
-                      <path d="M3 6h18" />
-                      <path d="M19 6v14c0 1-1 2-2 2H7c-1 0-2-1-2-2V6" />
-                      <path d="M8 6V4c0-1 1-2 2-2h4c1 0 2 1 2 2v2" />
-                    </svg>
-                  </button>
-                </div>
-              );
-            })}
-          </div>
-
-          {/* Add table inline */}
-          {addingTable ? (
-            <div className="mt-2 space-y-2">
-              <Input
-                type="text"
-                value={newTableName}
-                onChange={(e) => setNewTableName(e.target.value)}
-                onKeyDown={(e) => {
-                  if (e.key === "Enter") handleAddTable();
-                  if (e.key === "Escape") setAddingTable(false);
-                }}
-                placeholder="table_name"
-                className="h-8 text-xs"
-                autoFocus
+              <Image
+                src="/logo.jpg"
+                alt="Ember Logo"
+                width={24}
+                height={24}
+                className="rounded object-cover"
               />
-              <div className="flex gap-1.5">
-                <Button
-                  onClick={handleAddTable}
-                  disabled={!newTableName.trim()}
-                  size="sm"
-                  className="flex-1 h-7 text-xs"
+              <span className="text-xs font-medium text-muted-foreground">
+                Projects
+              </span>
+            </Link>
+            <div className="flex items-center gap-2">
+              <ThemeToggle />
+              <button
+                onClick={() => setSidebarOpen(false)}
+                className="p-1 hover:bg-accent rounded transition-colors"
+                title="Close sidebar"
+              >
+                <svg
+                  xmlns="http://www.w3.org/2000/svg"
+                  width="16"
+                  height="16"
+                  viewBox="0 0 24 24"
+                  fill="none"
+                  stroke="currentColor"
+                  strokeWidth="2"
+                  strokeLinecap="round"
+                  strokeLinejoin="round"
                 >
-                  Add
-                </Button>
-                <Button
-                  onClick={() => setAddingTable(false)}
-                  variant="outline"
-                  size="sm"
-                  className="flex-1 h-7 text-xs"
-                >
-                  Cancel
-                </Button>
-              </div>
+                  <path d="m11 17-5-5 5-5" />
+                  <path d="m18 17-5-5 5-5" />
+                </svg>
+              </button>
             </div>
-          ) : (
-            <button
-              onClick={() => setAddingTable(true)}
-              className="w-full mt-2 flex items-center gap-2 px-2.5 py-2 rounded-lg text-xs border border-dashed transition-all text-muted-foreground border-border"
-            >
-              <span>+</span>
-              <span>Add Table</span>
-            </button>
-          )}
-        </div>
+          </div>
 
-        {/* Bottom actions */}
-        <div className="p-3 border-t space-y-2 border-border mt-auto absolute bottom-0">
-          <Button
-            onClick={handleAutoLayout}
-            variant="outline"
-            size="sm"
-            className="w-full h-8 text-xs"
-          >
-            ⊞ Auto Layout
-          </Button>
-          <Button
-            onClick={() => setShowExport(true)}
-            size="sm"
-            className="w-full h-8 text-xs"
-          >
-            ↓ Export SQL
-          </Button>
-        </div>
+          {/* Project name */}
+          <div className="px-4 py-3">
+            <p className="text-[10px] uppercase tracking-wider mb-1 text-muted-foreground">
+              Project
+            </p>
+            <p className="text-sm font-bold truncate text-card-foreground">
+              {project.name}
+            </p>
+            {project.description && (
+              <p className="text-xs mt-0.5 truncate text-muted-foreground">
+                {project.description}
+              </p>
+            )}
+          </div>
+
+          {/* Tables list */}
+          <div className="flex-1 overflow-y-auto p-3">
+            <div className="flex items-center justify-between mb-2">
+              <p className="text-[10px] uppercase tracking-wider text-muted-foreground">
+                Tables ({nodes.length})
+              </p>
+            </div>
+            <div className="space-y-1">
+              {nodes.map((n) => {
+                const d = n.data as TableNodeData;
+                return (
+                  <div
+                    key={n.id}
+                    className={clsx(
+                      "group flex items-center gap-2 rounded-lg transition-all border",
+                      selectedTableId === n.id
+                        ? "bg-accent border-border"
+                        : "bg-transparent border-transparent",
+                    )}
+                  >
+                    <button
+                      onClick={() => setSelectedTableId(n.id)}
+                      className="flex-1 flex items-center gap-2 px-2.5 py-2 text-left"
+                    >
+                      <div
+                        className="w-2 h-2 rounded-full shrink-0"
+                        style={{ background: d.color }}
+                      />
+                      <span className="text-xs truncate flex-1 text-foreground">
+                        {d.name}
+                      </span>
+                      <span className="text-[10px] text-muted-foreground">
+                        {d.columns?.length || 0}
+                      </span>
+                    </button>
+                    <button
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        handleDeleteTable(n.id);
+                      }}
+                      className="px-2 py-2 opacity-0 group-hover:opacity-100 transition-opacity text-red-400 hover:text-red-300"
+                      title="Delete table"
+                    >
+                      <svg
+                        xmlns="http://www.w3.org/2000/svg"
+                        width="14"
+                        height="14"
+                        viewBox="0 0 24 24"
+                        fill="none"
+                        stroke="currentColor"
+                        strokeWidth="2"
+                        strokeLinecap="round"
+                        strokeLinejoin="round"
+                      >
+                        <path d="M3 6h18" />
+                        <path d="M19 6v14c0 1-1 2-2 2H7c-1 0-2-1-2-2V6" />
+                        <path d="M8 6V4c0-1 1-2 2-2h4c1 0 2 1 2 2v2" />
+                      </svg>
+                    </button>
+                  </div>
+                );
+              })}
+            </div>
+
+            {/* Add table inline */}
+            {addingTable ? (
+              <div className="mt-2 space-y-2">
+                <Input
+                  type="text"
+                  value={newTableName}
+                  onChange={(e) => setNewTableName(e.target.value)}
+                  onKeyDown={(e) => {
+                    if (e.key === "Enter") handleAddTable();
+                    if (e.key === "Escape") setAddingTable(false);
+                  }}
+                  placeholder="table_name"
+                  className="h-8 text-xs"
+                  autoFocus
+                />
+                <div className="flex gap-1.5">
+                  <Button
+                    onClick={handleAddTable}
+                    disabled={!newTableName.trim()}
+                    size="sm"
+                    className="flex-1 h-7 text-xs"
+                  >
+                    Add
+                  </Button>
+                  <Button
+                    onClick={() => setAddingTable(false)}
+                    variant="outline"
+                    size="sm"
+                    className="flex-1 h-7 text-xs"
+                  >
+                    Cancel
+                  </Button>
+                </div>
+              </div>
+            ) : (
+              <button
+                onClick={() => setAddingTable(true)}
+                className="w-full mt-2 flex items-center gap-2 px-2.5 py-2 rounded-lg text-xs border border-dashed transition-all text-muted-foreground border-border"
+              >
+                <span>+</span>
+                <span>Add Table</span>
+              </button>
+            )}
+          </div>
+
+          {/* Bottom actions */}
+          <div className="p-3 border-t space-y-2 border-border mt-auto absolute bottom-0">
+            <Button
+              onClick={handleAutoLayout}
+              variant="outline"
+              size="sm"
+              className="w-full h-8 text-xs"
+            >
+              ⊞ Auto Layout
+            </Button>
+            <Button
+              onClick={() => setShowExport(true)}
+              size="sm"
+              className="w-full h-8 text-xs"
+            >
+              ↓ Export SQL
+            </Button>
+          </div>
         </div>
       </div>
 

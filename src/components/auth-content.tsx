@@ -102,9 +102,13 @@ export default function AuthContent() {
           style={{ borderColor: "var(--border)" }}
         >
           <Link href="/" className="flex items-center gap-2">
-            <div className="w-8 h-8 rounded-lg flex items-center justify-center">
-              <span className="font-black text-sm">E</span>
-            </div>
+            <Image
+              src="/logo.jpg"
+              alt="Ember Logo"
+              width={32}
+              height={32}
+              className="rounded-lg object-cover"
+            />
             <span className="font-bold text-lg">Ember</span>
           </Link>
           <ThemeToggle />
@@ -172,7 +176,6 @@ export default function AuthContent() {
             </button>
           </div>
         </main>
-
       </div>
     );
   }
@@ -189,15 +192,13 @@ export default function AuthContent() {
         style={{ borderColor: "var(--border)" }}
       >
         <Link href="/" className="flex items-center gap-2">
-          <div
-            className="w-8 h-8 rounded-lg flex items-center justify-center"
-            style={{
-              background: "var(--primary)",
-              color: "var(--primary-foreground)",
-            }}
-          >
-            <span className="font-black text-sm">E</span>
-          </div>
+          <Image
+            src="/logo.jpg"
+            alt="Ember Logo"
+            width={32}
+            height={32}
+            className="rounded-lg object-cover"
+          />
           <span className="font-bold text-lg">Ember</span>
         </Link>
         <ThemeToggle />
@@ -207,15 +208,13 @@ export default function AuthContent() {
       <main className="flex-1 flex items-center justify-center px-4">
         <div className="w-full max-w-sm rounded-2xl p-8 text-center">
           {/* Logo */}
-          <div
-            className="w-16 h-16 rounded-2xl flex items-center justify-center text-3xl mx-auto mb-6"
-            style={{
-              background: "var(--accent)",
-              borderColor: "var(--border)",
-            }}
-          >
-            <span style={{ color: "var(--primary)" }}>E</span>
-          </div>
+          <Image
+            src="/logo.jpg"
+            alt="Ember Logo"
+            width={64}
+            height={64}
+            className="rounded-2xl object-cover mx-auto mb-6"
+          />
 
           <h1 className="text-2xl font-bold mb-2">Welcome to Ember</h1>
           <p

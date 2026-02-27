@@ -84,9 +84,13 @@ export default function SettingsPage() {
             href="/"
             className="flex items-center gap-2 hover:opacity-80 transition-opacity"
           >
-            <div className="w-7 h-7 rounded-lg flex items-center justify-center bg-primary text-primary-foreground">
-              <span className="font-black text-xs">E</span>
-            </div>
+            <Image
+              src="/logo.jpg"
+              alt="Ember Logo"
+              width={28}
+              height={28}
+              className="rounded-lg object-cover"
+            />
             <span className="font-bold text-sm text-foreground">Ember</span>
           </Link>
           <span className="text-muted-foreground">/</span>
@@ -136,11 +140,14 @@ export default function SettingsPage() {
                     />
                   ) : (
                     <div className="size-16 rounded-full bg-accent flex items-center justify-center text-2xl font-bold text-accent-foreground">
-                      {fullName?.[0]?.toUpperCase() || user?.email?.[0]?.toUpperCase() || "?"}
+                      {fullName?.[0]?.toUpperCase() ||
+                        user?.email?.[0]?.toUpperCase() ||
+                        "?"}
                     </div>
                   )}
                   <p className="text-sm text-muted-foreground">
-                    Profile picture is managed through your authentication provider
+                    Profile picture is managed through your authentication
+                    provider
                   </p>
                 </div>
               </div>
@@ -176,7 +183,9 @@ export default function SettingsPage() {
               <div className="flex justify-end pt-4 border-t border-border">
                 <Button
                   onClick={handleSaveProfile}
-                  disabled={saving || (fullName === user?.user_metadata?.full_name)}
+                  disabled={
+                    saving || fullName === user?.user_metadata?.full_name
+                  }
                 >
                   {saving ? "Saving..." : "Save Changes"}
                 </Button>

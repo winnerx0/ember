@@ -7,6 +7,7 @@ import clsx from "clsx";
 import { ThemeToggle } from "~/components/ThemeToggle";
 import { Spinner } from "~/components/ui/spinner";
 import { supabase } from "~/lib/supabase";
+import { Github } from "lucide-react";
 
 const DEMO_TABLES = [
   {
@@ -50,10 +51,21 @@ const DEMO_TABLES = [
 const FEATURES = [
   {
     icon: (
-      <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="text-primary">
-        <path d="M21 16V8a2 2 0 0 0-1-1.73l-7-4a2 2 0 0 0-2 0l-7 4A2 2 0 0 0 3 8v8a2 2 0 0 0 1 1.73l7 4a2 2 0 0 0 2 0l7-4A2 2 0 0 0 21 16z"/>
-        <polyline points="3.27 6.96 12 12.01 20.73 6.96"/>
-        <line x1="12" y1="22.08" x2="12" y2="12"/>
+      <svg
+        xmlns="http://www.w3.org/2000/svg"
+        width="24"
+        height="24"
+        viewBox="0 0 24 24"
+        fill="none"
+        stroke="currentColor"
+        strokeWidth="2"
+        strokeLinecap="round"
+        strokeLinejoin="round"
+        className="text-primary"
+      >
+        <path d="M21 16V8a2 2 0 0 0-1-1.73l-7-4a2 2 0 0 0-2 0l-7 4A2 2 0 0 0 3 8v8a2 2 0 0 0 1 1.73l7 4a2 2 0 0 0 2 0l7-4A2 2 0 0 0 21 16z" />
+        <polyline points="3.27 6.96 12 12.01 20.73 6.96" />
+        <line x1="12" y1="22.08" x2="12" y2="12" />
       </svg>
     ),
     title: "Visual ERD Designer",
@@ -62,9 +74,20 @@ const FEATURES = [
   },
   {
     icon: (
-      <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="text-primary">
-        <path d="M10 13a5 5 0 0 0 7.54.54l3-3a5 5 0 0 0-7.07-7.07l-1.72 1.71"/>
-        <path d="M14 11a5 5 0 0 0-7.54-.54l-3 3a5 5 0 0 0 7.07 7.07l1.71-1.71"/>
+      <svg
+        xmlns="http://www.w3.org/2000/svg"
+        width="24"
+        height="24"
+        viewBox="0 0 24 24"
+        fill="none"
+        stroke="currentColor"
+        strokeWidth="2"
+        strokeLinecap="round"
+        strokeLinejoin="round"
+        className="text-primary"
+      >
+        <path d="M10 13a5 5 0 0 0 7.54.54l3-3a5 5 0 0 0-7.07-7.07l-1.72 1.71" />
+        <path d="M14 11a5 5 0 0 0-7.54-.54l-3 3a5 5 0 0 0 7.07 7.07l1.71-1.71" />
       </svg>
     ),
     title: "Smart Relationships",
@@ -73,11 +96,22 @@ const FEATURES = [
   },
   {
     icon: (
-      <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="text-primary">
-        <path d="M16 21v-2a4 4 0 0 0-4-4H6a4 4 0 0 0-4 4v2"/>
-        <circle cx="9" cy="7" r="4"/>
-        <path d="M22 21v-2a4 4 0 0 0-3-3.87"/>
-        <path d="M16 3.13a4 4 0 0 1 0 7.75"/>
+      <svg
+        xmlns="http://www.w3.org/2000/svg"
+        width="24"
+        height="24"
+        viewBox="0 0 24 24"
+        fill="none"
+        stroke="currentColor"
+        strokeWidth="2"
+        strokeLinecap="round"
+        strokeLinejoin="round"
+        className="text-primary"
+      >
+        <path d="M16 21v-2a4 4 0 0 0-4-4H6a4 4 0 0 0-4 4v2" />
+        <circle cx="9" cy="7" r="4" />
+        <path d="M22 21v-2a4 4 0 0 0-3-3.87" />
+        <path d="M16 3.13a4 4 0 0 1 0 7.75" />
       </svg>
     ),
     title: "Realtime Collaboration",
@@ -86,10 +120,21 @@ const FEATURES = [
   },
   {
     icon: (
-      <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="text-primary">
-        <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/>
-        <polyline points="7 10 12 15 17 10"/>
-        <line x1="12" y1="15" x2="12" y2="3"/>
+      <svg
+        xmlns="http://www.w3.org/2000/svg"
+        width="24"
+        height="24"
+        viewBox="0 0 24 24"
+        fill="none"
+        stroke="currentColor"
+        strokeWidth="2"
+        strokeLinecap="round"
+        strokeLinejoin="round"
+        className="text-primary"
+      >
+        <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4" />
+        <polyline points="7 10 12 15 17 10" />
+        <line x1="12" y1="15" x2="12" y2="3" />
       </svg>
     ),
     title: "SQL Export",
@@ -98,8 +143,19 @@ const FEATURES = [
   },
   {
     icon: (
-      <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="text-primary">
-        <path d="M12 2v20M17 5H9.5a3.5 3.5 0 0 0 0 7h5a3.5 3.5 0 0 1 0 7H6"/>
+      <svg
+        xmlns="http://www.w3.org/2000/svg"
+        width="24"
+        height="24"
+        viewBox="0 0 24 24"
+        fill="none"
+        stroke="currentColor"
+        strokeWidth="2"
+        strokeLinecap="round"
+        strokeLinejoin="round"
+        className="text-primary"
+      >
+        <path d="M12 2v20M17 5H9.5a3.5 3.5 0 0 0 0 7h5a3.5 3.5 0 0 1 0 7H6" />
       </svg>
     ),
     title: "Rich Column Types",
@@ -108,8 +164,19 @@ const FEATURES = [
   },
   {
     icon: (
-      <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="text-primary">
-        <polygon points="13 2 3 14 12 14 11 22 21 10 12 10 13 2"/>
+      <svg
+        xmlns="http://www.w3.org/2000/svg"
+        width="24"
+        height="24"
+        viewBox="0 0 24 24"
+        fill="none"
+        stroke="currentColor"
+        strokeWidth="2"
+        strokeLinecap="round"
+        strokeLinejoin="round"
+        className="text-primary"
+      >
+        <polygon points="13 2 3 14 12 14 11 22 21 10 12 10 13 2" />
       </svg>
     ),
     title: "Instant Sync",
@@ -302,15 +369,13 @@ export default function LandingPage() {
       {/* ── Nav ───────────────────────────────────────────────────── */}
       <nav className="fixed top-0 left-0 right-0 z-50 flex items-center justify-between px-6 sm:px-8 lg:px-12 py-4 border-b backdrop-blur-xl border-border bg-background/85">
         <div className="flex items-center gap-2">
-          <div
-            className="w-7 h-7 rounded-lg flex items-center justify-center"
-            style={{
-              background: "var(--primary)",
-              color: "var(--primary-foreground)",
-            }}
-          >
-            <span className="font-black text-xs">E</span>
-          </div>
+          <Image
+            src="/logo.jpg"
+            alt="Ember Logo"
+            width={28}
+            height={28}
+            className="rounded-lg object-cover"
+          />
           <span className="font-bold text-base tracking-tight">Ember</span>
           <span className="ml-1 px-1.5 py-0.5 rounded-full text-[10px] font-semibold border bg-accent text-accent-foreground border-border">
             BETA
@@ -319,6 +384,15 @@ export default function LandingPage() {
 
         <div className="flex items-center gap-3">
           <ThemeToggle />
+          <a
+            href="https://github.com/winnerx0/ember"
+            target="_blank"
+            rel="noopener noreferrer"
+            className="hidden sm:flex items-center gap-2 px-3 py-2 rounded-lg text-sm font-semibold transition-all hover:bg-accent border border-border"
+          >
+            <Github className="size-4" />
+            <span>Star on GitHub</span>
+          </a>
           {user ? (
             <Link href="/app">
               <Image
@@ -461,7 +535,7 @@ export default function LandingPage() {
             {FEATURES.map((f) => (
               <div
                 key={f.title}
-                className="group p-6 sm:p-8 rounded-2xl border transition-all duration-300 hover:-translate-y-1 bg-card border-border"
+                className="group p-6 sm:p-8 rounded-2xl border transition-all duration-300 bg-card border-border"
               >
                 <div className="w-12 h-12 rounded-xl flex items-center justify-center text-2xl mb-5 transition-transform group-hover:scale-110 border bg-accent border-border">
                   {f.icon}
@@ -495,7 +569,10 @@ export default function LandingPage() {
 
           <div className="grid sm:grid-cols-2 gap-6 lg:gap-8">
             {STEPS.map((s) => (
-              <div className="flex gap-5 p-6 sm:p-8 rounded-2xl border transition-all duration-300 bg-card border-border" key={s.step}>
+              <div
+                className="flex gap-5 p-6 sm:p-8 rounded-2xl border transition-all duration-300 bg-card border-border"
+                key={s.step}
+              >
                 <div className="flex-shrink-0 w-12 h-12 rounded-xl flex items-center justify-center font-black text-sm border bg-accent border-border text-accent-foreground">
                   {s.step}
                 </div>
@@ -653,15 +730,13 @@ export default function LandingPage() {
         }}
       >
         <div className="flex items-center justify-center gap-2 mb-2">
-          <div
-            className="w-5 h-5 rounded flex items-center justify-center"
-            style={{
-              background: "var(--primary)",
-              color: "var(--primary-foreground)",
-            }}
-          >
-            <span className="font-black text-[10px]">E</span>
-          </div>
+          <Image
+            src="/logo.jpg"
+            alt="Ember Logo"
+            width={20}
+            height={20}
+            className="rounded object-cover"
+          />
           <span
             className="font-semibold text-sm"
             style={{ color: "var(--foreground)" }}
@@ -670,6 +745,17 @@ export default function LandingPage() {
           </span>
         </div>
         <p className="text-xs">© 2026 Ember. Built for PostgreSQL lovers.</p>
+        <div className="mt-4 flex justify-center">
+          <a
+            href="https://github.com/winnerx0/ember"
+            target="_blank"
+            rel="noopener noreferrer"
+            className="text-xs hover:underline flex items-center gap-1 font-medium"
+          >
+            <Github className="size-3" />
+            GitHub
+          </a>
+        </div>
       </footer>
     </div>
   );
