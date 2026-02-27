@@ -12,6 +12,30 @@ export const metadata = {
   icons: {
     icon: "/logo.jpg",
   },
+  openGraph: {
+    title: "Ember — Visual PostgreSQL ERD Designer",
+    description:
+      "Design your PostgreSQL database schema visually with Ember. Create ERDs, define relationships, and export production-ready SQL instantly.",
+    url: "https://ember-erd.vercel.app",
+    siteName: "Ember",
+    images: [
+      {
+        url: "/logo-2.jpg",
+        width: 1200,
+        height: 630,
+        alt: "Ember - Visual PostgreSQL ERD Designer",
+      },
+    ],
+    locale: "en_US",
+    type: "website",
+  },
+  twitter: {
+    card: "summary_large_image",
+    title: "Ember — Visual PostgreSQL ERD Designer",
+    description:
+      "Design your PostgreSQL database schema visually with Ember. Create ERDs, define relationships, and export production-ready SQL instantly.",
+    images: ["/logo-2.jpg"],
+  },
 };
 
 export default function RootLayout({ children }: { children: ReactNode }) {
