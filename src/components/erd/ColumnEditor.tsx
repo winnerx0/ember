@@ -82,7 +82,7 @@ export function ColumnEditor({
   onSave,
   onClose,
 }: Props) {
-  const [name, setName] = useState(table.name);
+  const [name, setName] = useState(table.name || "");
   const [color, setColor] = useState(table.color);
   const [columns, setColumns] = useState<ColumnDraft[]>(
     table.columns.length > 0

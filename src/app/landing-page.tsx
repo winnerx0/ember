@@ -463,7 +463,7 @@ export default function LandingPage() {
 
           <div className="grid sm:grid-cols-2 gap-6 lg:gap-8">
             {STEPS.map((s) => (
-              <div className="flex gap-5 p-6 sm:p-8 rounded-2xl border transition-all duration-300 bg-card border-border">
+              <div className="flex gap-5 p-6 sm:p-8 rounded-2xl border transition-all duration-300 bg-card border-border" key={s.step}>
                 <div className="flex-shrink-0 w-12 h-12 rounded-xl flex items-center justify-center font-black text-sm border bg-accent border-border text-accent-foreground">
                   {s.step}
                 </div>
