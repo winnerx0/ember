@@ -8,13 +8,15 @@ A visual PostgreSQL schema designer built for developers who want to design data
 ## Features
 
 - **Visual ERD Designer** - Drag, drop, and connect tables on an infinite canvas powered by React Flow
-- **Smart Relationships** - Draw foreign key relationships with crow's feet notation (one-to-one, one-to-many, many-to-many)
-- **SQL Export** - Generate production-ready PostgreSQL DDL with CREATE TABLE, FOREIGN KEY constraints, and indexes
+- **Smart Relationships** - Draw foreign key relationships with automatic column management (one-to-one, one-to-many, many-to-many)
+- **SQL Export** - Generate production-ready PostgreSQL DDL with CREATE TABLE, FOREIGN KEY constraints, junction tables, and CASCADE rules
 - **Realtime Collaboration** - See changes from other users instantly with Supabase Realtime subscriptions
-- **Instant Persistence** - Every change is saved to PostgreSQL instantly via Supabase
+- **Optimistic Updates** - Instant UI feedback with automatic rollback on errors
 - **Rich Column Types** - Full PostgreSQL type support including UUID, JSONB, TIMESTAMPTZ, arrays, and more
 - **Auto Layout** - One-click intelligent table arrangement with zoom, pan, and minimap
 - **Dark/Light Theme** - Beautiful theme system with smooth transitions
+- **Collapsible Sidebar** - Toggle sidebar visibility for maximum canvas space
+- **User Profiles** - Integrated user menu with settings and authentication
 - **Mobile Responsive** - Works seamlessly on desktop, tablet, and mobile devices
 
 ## Quick Start
@@ -54,14 +56,14 @@ cp .env.example .env
 
 Edit `.env` with your Supabase credentials:
 ```env
-VITE_SUPABASE_URL=your_supabase_project_url
-VITE_SUPABASE_PUBLISHABLE_KEY=your_supabase_anon_key
+NEXT_PUBLIC_SUPABASE_URL=your_supabase_project_url
+NEXT_PUBLIC_SUPABASE_ANON_KEY=your_supabase_anon_key
 ```
 
 4. Set up your Supabase database:
    - Create a new project in Supabase
    - Run the SQL schema from `supabase/schema.sql` in the SQL editor
-   - Enable Realtime for the tables: `projects`, `erd_tables`, `erd_columns`, `erd_relationships`
+   - Enable Realtime for the tables: `erd_projects`, `erd_tables`, `erd_columns`, `erd_relationships`
 
 5. Start the development server:
 ```bash
@@ -70,15 +72,16 @@ npm run dev
 bun run dev
 ```
 
-6. Open [http://localhost:5174](http://localhost:5174) in your browser
+6. Open [http://localhost:3000](http://localhost:3000) in your browser
 
 ## Tech Stack
 
-- **Frontend**: React 18, TanStack Router, TanStack Start
+- **Frontend**: Next.js 15 (App Router), React 19
 - **Canvas**: React Flow (for the ERD canvas)
 - **Database**: PostgreSQL via Supabase (with realtime subscriptions)
+- **State Management**: TanStack Query (React Query)
 - **Styling**: Tailwind CSS, shadcn/ui
-- **Build**: Vite
+- **Authentication**: Supabase Auth (Google OAuth)
 - **Runtime**: Node.js or Bun
 
 ## Usage
@@ -98,7 +101,7 @@ bun run dev
 ### Editing Tables
 
 1. Click on a table to open the column editor
-2. Add columns with the "+ Add" button
+2. Add columns with the "+ Add Column" button
 3. Configure column properties:
    - Name and data type
    - Primary Key (PK)
@@ -110,18 +113,30 @@ bun run dev
 
 ### Creating Relationships
 
-1. Hover over a table to reveal connection handles
-2. Drag from a column handle to another table's column
+1. Drag from the owner/parent table (the "one" side) to the child table (the "many" side)
+2. Foreign key columns are automatically created in the appropriate table
 3. Click on the relationship line to change the type:
-   - One-to-One
-   - One-to-Many (default)
-   - Many-to-Many
-4. Relationships show crow's feet notation automatically
+   - One-to-One (FK in target table)
+   - One-to-Many (FK in target table, default)
+   - Many-to-One (FK in source table)
+   - Many-to-Many (creates junction table)
+4. Foreign key columns are automatically moved when changing relationship types
+5. Deleting a relationship removes the associated foreign key column
+
+### Deleting Tables
+
+1. Click the delete icon on a table in the sidebar
+2. Confirm the deletion
+3. All foreign key columns referencing the deleted table are automatically removed from other tables
 
 ### Exporting SQL
 
 1. Click "Export SQL" in the sidebar
-2. Review the generated PostgreSQL DDL
+2. Review the generated PostgreSQL DDL including:
+   - CREATE TABLE statements
+   - PRIMARY KEY constraints
+   - FOREIGN KEY constraints with CASCADE rules
+   - Junction tables for many-to-many relationships
 3. Copy to clipboard or download as `.sql` file
 4. Run the SQL in your PostgreSQL database
 
@@ -129,40 +144,51 @@ bun run dev
 
 Click "Auto Layout" to automatically arrange tables in a grid pattern with optimal spacing.
 
+### Sidebar Controls
+
+- Click the collapse button (<<) to hide the sidebar for more canvas space
+- Click the hamburger menu button to reopen the sidebar
+- Theme toggle and user menu are always accessible
+
 ## Project Structure
 
 ```
 ember/
 ├── src/
+│   ├── app/
+│   │   ├── app/
+│   │   │   ├── page.tsx           # Projects dashboard
+│   │   │   ├── [projectId]/
+│   │   │   │   └── page.tsx       # ERD canvas
+│   │   │   └── settings/
+│   │   │       └── page.tsx       # User settings
+│   │   ├── auth/
+│   │   │   └── page.tsx           # Authentication page
+│   │   ├── layout.tsx             # Root layout
+│   │   ├── page.tsx               # Landing page
+│   │   └── providers.tsx          # React Query provider
 │   ├── components/
-│   │   ├── erd/              # ERD-specific components
+│   │   ├── erd/                   # ERD-specific components
 │   │   │   ├── TableNode.tsx
 │   │   │   ├── ColumnEditor.tsx
 │   │   │   ├── RelationshipEdge.tsx
 │   │   │   └── ExportModal.tsx
-│   │   ├── ui/               # shadcn/ui components
-│   │   └── ThemeToggle.tsx
-
+│   │   ├── ui/                    # shadcn/ui components
+│   │   ├── ThemeToggle.tsx
+│   │   └── UserMenu.tsx
 │   ├── lib/
-│   │   ├── supabase.ts       # Supabase client
-│   │   └── utils.ts          # Utility functions
-│   ├── routes/               # TanStack Router routes
-│   │   ├── index.tsx         # Landing page
-│   │   ├── app/
-│   │   │   ├── index.tsx     # Projects dashboard
-│   │   │   └── $projectId.tsx # ERD canvas
-│   │   └── __root.tsx
-│   ├── server/               # Server functions
+│   │   ├── supabase.ts            # Supabase client
+│   │   └── utils.ts               # Utility functions
+│   ├── server/                    # Server actions
+│   │   ├── auth.ts
 │   │   ├── projects.ts
 │   │   ├── tables.ts
 │   │   ├── columns.ts
 │   │   ├── relationships.ts
 │   │   └── export.ts
-│   ├── styles/
-│   │   └── app.css           # Global styles & theme
-│   ├── client.tsx            # Client entry
-│   └── ssr.tsx               # SSR entry
-├── vite.config.ts            # Vite configuration
+│   └── middleware.ts              # Auth middleware
+├── next.config.ts
+├── tailwind.config.ts
 └── package.json
 ```
 
@@ -197,17 +223,28 @@ This project is licensed under the MIT License - see the [LICENSE](LICENSE) file
 ## 🙏 Acknowledgments
 
 - [React Flow](https://reactflow.dev/) - For the amazing canvas library
-- [TanStack](https://tanstack.com/) - For routing and SSR
+- [Next.js](https://nextjs.org/) - For the React framework
+- [TanStack Query](https://tanstack.com/query) - For data synchronization
 - [shadcn/ui](https://ui.shadcn.com/) - For beautiful UI components
 - [Supabase](https://supabase.com/) - For the PostgreSQL database and realtime features
 
 ## Recent Updates
 
+### Latest Features
+- **Optimistic Updates**: All table and relationship operations now update the UI instantly with automatic error rollback
+- **Smart Column Management**: Foreign key columns are automatically created, moved, and deleted based on relationship changes
+- **Upsert Operations**: Column saving now uses upsert to prevent duplicate key errors
+- **Collapsible Sidebar**: Toggle sidebar visibility for maximum canvas space
+- **User Menu Component**: Reusable user profile dropdown with avatar support
+- **Settings Page**: User profile management with theme toggle
+- **Improved SQL Export**: Proper junction table generation for many-to-many relationships with CASCADE rules
+
 ### Bug Fixes
-- Fixed SSR hydration mismatch with theme and app loader
-- Fixed SQL export foreign key generation to correctly handle relationship directions
-- Fixed download functionality in export modal
-- Improved error handling in SQL export with proper null checks
+- Fixed duplicate key errors when saving columns by using upsert instead of separate insert/update
+- Fixed foreign key columns not being removed when changing relationship types
+- Fixed foreign key columns persisting after table deletion
+- Fixed many-to-many relationships not generating proper junction tables in SQL export
+- Fixed theme toggle and user menu layout issues
 
 ## 📧 Contact
 
