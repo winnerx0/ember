@@ -14,7 +14,6 @@ A visual PostgreSQL schema designer built for developers who want to design data
 - **Optimistic Updates** - Instant UI feedback with automatic rollback on errors
 - **Rich Column Types** - Full PostgreSQL type support including UUID, JSONB, TIMESTAMPTZ, arrays, and more
 - **Auto Layout** - One-click intelligent table arrangement with zoom, pan, and minimap
-- **Dark/Light Theme** - Beautiful theme system with smooth transitions
 - **Collapsible Sidebar** - Toggle sidebar visibility for maximum canvas space
 - **User Profiles** - Integrated user menu with settings and authentication
 - **Mobile Responsive** - Works seamlessly on desktop, tablet, and mobile devices
@@ -23,16 +22,12 @@ A visual PostgreSQL schema designer built for developers who want to design data
 
 Want to get started quickly? Check out the [Quick Start Guide](QUICKSTART.md) for a 5-minute setup!
 
-For detailed instructions, see [SETUP.md](SETUP.md).
-
 ### Prerequisites
 
 - Node.js 18+ or Bun
 - Supabase account (free tier available at https://supabase.com)
 
 ### Installation
-
-See the detailed [SETUP.md](SETUP.md) guide for complete setup instructions.
 
 Quick start:
 
@@ -58,6 +53,8 @@ Edit `.env` with your Supabase credentials:
 ```env
 NEXT_PUBLIC_SUPABASE_URL=your_supabase_project_url
 NEXT_PUBLIC_SUPABASE_ANON_KEY=your_supabase_anon_key
+DATABASE_URL=postgresql://username:password@localhost:5432/ember
+REDIS_URL=redis://username:password@localhost:6379
 ```
 
 4. Set up your Supabase database:
@@ -157,36 +154,36 @@ ember/
 ├── src/
 │   ├── app/
 │   │   ├── app/
-│   │   │   ├── page.tsx           # Projects dashboard
+│   │   │   ├── page.tsx       
 │   │   │   ├── [projectId]/
-│   │   │   │   └── page.tsx       # ERD canvas
+│   │   │   │   └── page.tsx     
 │   │   │   └── settings/
-│   │   │       └── page.tsx       # User settings
+│   │   │       └── page.tsx     
 │   │   ├── auth/
-│   │   │   └── page.tsx           # Authentication page
-│   │   ├── layout.tsx             # Root layout
-│   │   ├── page.tsx               # Landing page
-│   │   └── providers.tsx          # React Query provider
+│   │   │   └── page.tsx         
+│   │   ├── layout.tsx           
+│   │   ├── page.tsx             
+│   │   └── providers.tsx     
 │   ├── components/
-│   │   ├── erd/                   # ERD-specific components
+│   │   ├── erd/             
 │   │   │   ├── TableNode.tsx
 │   │   │   ├── ColumnEditor.tsx
 │   │   │   ├── RelationshipEdge.tsx
 │   │   │   └── ExportModal.tsx
-│   │   ├── ui/                    # shadcn/ui components
+│   │   ├── ui/                   
 │   │   ├── ThemeToggle.tsx
 │   │   └── UserMenu.tsx
 │   ├── lib/
-│   │   ├── supabase.ts            # Supabase client
-│   │   └── utils.ts               # Utility functions
-│   ├── server/                    # Server actions
+│   │   ├── supabase.ts          
+│   │   └── utils.ts             
+│   ├── server/                  
 │   │   ├── auth.ts
 │   │   ├── projects.ts
 │   │   ├── tables.ts
 │   │   ├── columns.ts
 │   │   ├── relationships.ts
 │   │   └── export.ts
-│   └── middleware.ts              # Auth middleware
+│   └── middleware.ts          
 ├── next.config.ts
 ├── tailwind.config.ts
 └── package.json
