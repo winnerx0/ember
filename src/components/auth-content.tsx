@@ -8,10 +8,11 @@ import { ThemeToggle } from "~/components/ThemeToggle";
 import { Spinner } from "~/components/ui/spinner";
 import { FcGoogle } from "react-icons/fc";
 import Image from "next/image";
+import { User } from "@supabase/supabase-js";
 
-export default function AuthPage() {
+export default function AuthContent() {
   const [loading, setLoading] = useState(true);
-  const [user, setUser] = useState<any>(null);
+  const [user, setUser] = useState<User | null | undefined>(undefined);
   const searchParams = useSearchParams();
   const redirectTo = searchParams.get("redirectTo") || "/app";
 
@@ -172,15 +173,6 @@ export default function AuthPage() {
           </div>
         </main>
 
-        {/* Footer */}
-        <footer
-          className="py-4 text-center text-xs"
-          style={{ color: "var(--muted-foreground)" }}
-        >
-          <Link href="/" className="hover:opacity-80">
-            ← Back to home
-          </Link>
-        </footer>
       </div>
     );
   }

@@ -9,7 +9,7 @@ import { clearSessionCookies } from "~/server/auth";
 import type { User } from "@supabase/supabase-js";
 
 interface UserMenuProps {
-  user: User | null;
+  user: User | null | undefined;
   showSettings?: boolean;
 }
 
