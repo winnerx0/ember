@@ -6,3 +6,4 @@
 app.config*.js
 .next
 .env.local
+supabase/.temp

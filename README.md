@@ -225,26 +225,6 @@ This project is licensed under the MIT License - see the [LICENSE](LICENSE) file
 - [shadcn/ui](https://ui.shadcn.com/) - For beautiful UI components
 - [Supabase](https://supabase.com/) - For the PostgreSQL database and realtime features
 
-## Recent Updates
-
-### Latest Features
-- **Optimistic Updates**: All table and relationship operations now update the UI instantly with automatic error rollback
-- **Smart Column Management**: Foreign key columns are automatically created, moved, and deleted based on relationship changes
-- **Upsert Operations**: Column saving now uses upsert to prevent duplicate key errors
-- **Collapsible Sidebar**: Toggle sidebar visibility for maximum canvas space
-- **User Menu Component**: Reusable user profile dropdown with avatar support
-- **Settings Page**: User profile management with theme toggle
-- **Improved SQL Export**: Proper junction table generation for many-to-many relationships with CASCADE rules
-
-### Bug Fixes
-- Fixed duplicate key errors when saving columns by using upsert instead of separate insert/update
-- Fixed foreign key columns not being removed when changing relationship types
-- Fixed foreign key columns persisting after table deletion
-- Fixed many-to-many relationships not generating proper junction tables in SQL export
-- Fixed theme toggle and user menu layout issues
-
 ## 📧 Contact
 
 For questions or feedback, please open an issue on GitHub.
-
----
