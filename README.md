@@ -8,7 +8,7 @@ A visual PostgreSQL schema designer built for developers who want to design data
 ## Features
 
 - **Visual ERD Designer** - Drag, drop, and connect tables on an infinite canvas powered by React Flow
-- **Smart Relationships** - Draw foreign key relationships with automatic column management (one-to-one, one-to-many, many-to-many)
+- **Smart Relationships** - Draw foreign key relationships with automatic column management (one-to-one, one-to-many, many-to-one, many-to-many)
 - **SQL Export** - Generate production-ready PostgreSQL DDL with CREATE TABLE, FOREIGN KEY constraints, junction tables, and CASCADE rules
 - **Realtime Collaboration** - See changes from other users instantly with Supabase Realtime subscriptions
 - **Optimistic Updates** - Instant UI feedback with automatic rollback on errors
@@ -19,8 +19,6 @@ A visual PostgreSQL schema designer built for developers who want to design data
 - **Mobile Responsive** - Works seamlessly on desktop, tablet, and mobile devices
 
 ## Quick Start
-
-Want to get started quickly? Check out the [Quick Start Guide](QUICKSTART.md) for a 5-minute setup!
 
 ### Prerequisites
 
@@ -52,7 +50,7 @@ cp .env.example .env
 Edit `.env` with your Supabase credentials:
 ```env
 NEXT_PUBLIC_SUPABASE_URL=your_supabase_project_url
-NEXT_PUBLIC_SUPABASE_ANON_KEY=your_supabase_anon_key
+NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY=your_supabase_anon_key
 DATABASE_URL=postgresql://username:password@localhost:5432/ember
 REDIS_URL=redis://username:password@localhost:6379
 ```
@@ -98,27 +96,28 @@ bun run dev
 ### Editing Tables
 
 1. Click on a table to open the column editor
-2. Add columns with the "+ Add Column" button
-3. Configure column properties:
+2. Rename the table — spaces are automatically converted to underscores as you type
+3. Add columns with the "+ Add Column" button
+4. Configure column properties:
    - Name and data type
    - Primary Key (PK)
    - Unique constraint
    - Nullable
    - Default value
-4. Choose a color for the table
-5. Click "Save Changes"
+5. Choose a color for the table
+6. Click "Save Changes" or click outside the panel to auto-save
 
 ### Creating Relationships
 
 1. Drag from the owner/parent table (the "one" side) to the child table (the "many" side)
-2. Foreign key columns are automatically created in the appropriate table
-3. Click on the relationship line to change the type:
-   - One-to-One (FK in target table)
-   - One-to-Many (FK in target table, default)
-   - Many-to-One (FK in source table)
-   - Many-to-Many (creates junction table)
-4. Foreign key columns are automatically moved when changing relationship types
-5. Deleting a relationship removes the associated foreign key column
+2. A foreign key column is automatically created in the appropriate table
+3. Click on the relationship line when selected to change the cardinality:
+   - **One-to-One** — FK in target table
+   - **One-to-Many** — FK in target table (default)
+   - **Many-to-One** — FK in source table
+   - **Many-to-Many** — no FK columns; a junction table is generated on SQL export
+4. When changing types, FK columns are automatically moved to the correct table
+5. Deleting a relationship removes its associated foreign key column
 
 ### Deleting Tables
 

@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useState, useRef, useEffect, useCallback } from "react";
 import { Button } from "~/components/ui/button";
 import { Input } from "~/components/ui/input";
 import { Label } from "~/components/ui/label";
@@ -33,6 +33,31 @@ const PG_TYPES = [
   "jsonb",
   "bytea",
 ];
+
+// Suggested default values per PostgreSQL type
+function getSuggestedDefault(type: string): string {
+  switch (type) {
+    case "uuid": return "gen_random_uuid()";
+    case "timestamptz":
+    case "timestamp": return "now()";
+    case "date": return "current_date";
+    case "boolean": return "false";
+    case "integer":
+    case "bigint":
+    case "smallint":
+    case "numeric":
+    case "real":
+    case "double precision": return "0";
+    case "serial":
+    case "bigserial": return "";
+    case "json":
+    case "jsonb": return "'{}'";
+    case "text":
+    case "varchar":
+    case "char": return "''";
+    default: return "";
+  }
+}
 
 const TABLE_COLORS = [
   "oklch(0.488 0.243 264.376)", // Blue/Purple - dark mode chart-1
@@ -101,6 +126,31 @@ export function ColumnEditor({
         ],
   );
   const [saving, setSaving] = useState(false);
+  const containerRef = useRef<HTMLDivElement>(null);
+
+  // Auto-save and close when clicking outside the panel
+  const handleSaveRef = useRef<() => Promise<void>>(async () => {});
+  useEffect(() => {
+    handleSaveRef.current = async () => {
+      if (!name.trim()) { onClose(); return; }
+      setSaving(true);
+      try {
+        const sanitizedName = name.trim().replace(/\s+/g, "_");
+        await onSave({ name: sanitizedName, color, columns: columns.map((c, i) => ({ ...c, order: i })) });
+      } catch { /* stay open on error */ }
+      finally { setSaving(false); }
+    };
+  });
+
+  useEffect(() => {
+    const handleMouseDown = (e: MouseEvent) => {
+      if (containerRef.current && !containerRef.current.contains(e.target as Node)) {
+        handleSaveRef.current?.();
+      }
+    };
+    document.addEventListener("mousedown", handleMouseDown);
+    return () => document.removeEventListener("mousedown", handleMouseDown);
+  }, []);
 
   // Helper to check if a column is a FK
   const getFKInfo = (columnName: string) => {
@@ -174,18 +224,16 @@ export function ColumnEditor({
   };
 
   const handleSave = async () => {
+    if (!name.trim()) return;
     setSaving(true);
     try {
-      // Replace spaces with underscores in table name
       const sanitizedName = name.trim().replace(/\s+/g, "_");
-
       await onSave({
         name: sanitizedName,
         color,
         columns: columns.map((c, i) => ({ ...c, order: i })),
       });
-
-      // Note: onClose is now called by the parent after cache invalidation
+      // onClose is called by parent (handleSaveTable sets selectedTableId to null)
     } catch (error) {
       console.error("Failed to save:", error);
       // Don't close on error so user can retry
@@ -195,7 +243,7 @@ export function ColumnEditor({
   };
 
   return (
-    <div className="fixed right-0 top-0 bottom-0 w-96 z-40 flex flex-col overflow-hidden border-l border-border bg-card shadow-2xl">
+    <div ref={containerRef} className="fixed right-0 top-0 bottom-0 w-96 z-40 flex flex-col overflow-hidden border-l border-border bg-card shadow-2xl">
       {/* Header */}
       <div className="flex items-center justify-between px-5 py-4 border-b border-border">
         <h3 className="font-bold text-base text-card-foreground">Edit Table</h3>
@@ -221,7 +269,7 @@ export function ColumnEditor({
             id="table-name"
             type="text"
             value={name}
-            onChange={(e) => setName(e.target.value)}
+            onChange={(e) => setName(e.target.value.replace(/^\s+/, "").replace(/\s/g, "_"))}
             className="h-10 text-sm font-medium focus-visible:ring-primary/50"
           />
         </div>
@@ -366,16 +414,27 @@ export function ColumnEditor({
 
                     {/* Default Value */}
                     <div className="space-y-1.5">
-                      <Label className="text-[10px] uppercase font-bold opacity-50">
-                        Default
-                      </Label>
+                      <div className="flex items-center justify-between">
+                        <Label className="text-[10px] uppercase font-bold opacity-50">
+                          Default
+                        </Label>
+                        {getSuggestedDefault(col.type) && (
+                          <button
+                            type="button"
+                            onClick={() => updateColumn(col.id, "defaultValue", getSuggestedDefault(col.type))}
+                            className="text-[9px] px-1.5 py-0.5 rounded font-mono opacity-50 hover:opacity-100 transition-opacity border border-border"
+                          >
+                            {getSuggestedDefault(col.type)}
+                          </button>
+                        )}
+                      </div>
                       <Input
                         type="text"
                         value={col.defaultValue}
                         onChange={(e) =>
                           updateColumn(col.id, "defaultValue", e.target.value)
                         }
-                        placeholder="e.g. now()"
+                        placeholder={getSuggestedDefault(col.type) || "no default"}
                         className="h-8 text-xs bg-card/50 border-none ring-1 ring-border shadow-none focus-visible:ring-primary/50"
                       />
                     </div>

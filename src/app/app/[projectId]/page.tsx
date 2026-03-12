@@ -19,7 +19,7 @@ import {
 } from "@xyflow/react";
 import "@xyflow/react/dist/style.css";
 import { useCallback, useState, useRef, useEffect, use } from "react";
-import { useQuery, useQueryClient } from "@tanstack/react-query";
+import { useQuery } from "@tanstack/react-query";
 import { getProject } from "~/server/projects";
 import {
   addTable,
@@ -59,12 +59,12 @@ const TABLE_COLORS = [
 ];
 
 function ERDCanvas({ params }: { params: { projectId: string } }) {
-  const queryClient = useQueryClient();
   const projectId = params.projectId;
 
   const { data: project, isLoading: loading } = useQuery({
     queryKey: ["project", projectId],
     queryFn: () => getProject({ data: { id: projectId } }),
+    staleTime: 5 * 60 * 1000,
   });
 
   const reactFlowInstance = useReactFlow();
@@ -88,6 +88,16 @@ function ERDCanvas({ params }: { params: { projectId: string } }) {
   const colorIdx = useRef(0);
   const initialLoadDone = useRef(false);
   const pendingChanges = useRef<Set<string>>(new Set());
+
+  // Undo/redo history (snapshots of nodes + edges)
+  const history = useRef<Array<{ nodes: Node[]; edges: Edge[] }>>([]);
+  const historyIndex = useRef<number>(-1);
+  const [canUndo, setCanUndo] = useState(false);
+  const [canRedo, setCanRedo] = useState(false);
+
+  // Stable refs so subscriptions don't re-subscribe on every state change
+  const nodesRef = useRef<Node[]>([]);
+  const edgesRef = useRef<Edge[]>([]);
 
   // LocalStorage keys
   const STORAGE_KEY = `erd-project-${projectId}`;
@@ -117,6 +127,10 @@ function ERDCanvas({ params }: { params: { projectId: string } }) {
       localStorage.setItem(STORAGE_KEY, JSON.stringify(data));
     }
   }, [nodes, edges, projectId, STORAGE_KEY]);
+
+  // Keep refs in sync (used in subscriptions to avoid stale closures)
+  useEffect(() => { nodesRef.current = nodes; }, [nodes]);
+  useEffect(() => { edgesRef.current = edges; }, [edges]);
 
   // Sync to database every 5 minutes
   const syncToDatabase = useCallback(async () => {
@@ -192,6 +206,108 @@ function ERDCanvas({ params }: { params: { projectId: string } }) {
     }
   }, [nodes, edges, projectId, LAST_SYNC_KEY]);
 
+  // Push a snapshot to undo history after every significant operation
+  const pushToHistory = useCallback((newNodes: Node[], newEdges: Edge[]) => {
+    // Truncate any "redo" states
+    history.current = history.current.slice(0, historyIndex.current + 1);
+    history.current.push({
+      nodes: newNodes.map((n) => ({ ...n, data: { ...n.data } })),
+      edges: newEdges.map((e) => ({ ...e, data: { ...e.data } })),
+    });
+    if (history.current.length > 50) history.current.shift();
+    historyIndex.current = history.current.length - 1;
+    setCanUndo(historyIndex.current > 0);
+    setCanRedo(false);
+  }, []);
+
+  // Sync an arbitrary state snapshot to the database (used after undo/redo)
+  const syncHistoryState = useCallback(
+    async (prevNodes: Node[], prevEdges: Edge[], nextNodes: Node[], nextEdges: Edge[]) => {
+      const prevNodeIds = new Set(prevNodes.map((n) => n.id));
+      const nextNodeIds = new Set(nextNodes.map((n) => n.id));
+      const prevEdgeIds = new Set(prevEdges.map((e) => e.id));
+      const nextEdgeIds = new Set(nextEdges.map((e) => e.id));
+
+      // Delete removed tables (cascades to columns + relationships)
+      for (const id of [...prevNodeIds].filter((id) => !nextNodeIds.has(id))) {
+        try { await deleteTable({ data: { id, projectId } }); } catch { /* ignore */ }
+      }
+      // Delete removed relationships
+      for (const id of [...prevEdgeIds].filter((id) => !nextEdgeIds.has(id))) {
+        try { await deleteRelationship({ data: { id, projectId } }); } catch { /* ignore */ }
+      }
+      // Re-add tables that were restored by undo
+      for (const node of nextNodes.filter((n) => !prevNodeIds.has(n.id))) {
+        const d = node.data as TableNodeData;
+        try {
+          await addTable({ data: { id: node.id, projectId, name: d.name, color: d.color, positionX: node.position.x, positionY: node.position.y } });
+          if (d.columns?.length) {
+            await saveColumns({ data: { tableId: node.id, projectId, columns: d.columns.map((c, i) => ({ ...c, defaultValue: c.defaultValue || undefined, order: i })) } });
+          }
+        } catch { /* may already exist, updateTable below will handle it */ }
+      }
+      // Re-add relationships that were restored by undo
+      for (const edge of nextEdges.filter((e) => !prevEdgeIds.has(e.id))) {
+        const edgeData = edge.data as any;
+        const srcNode = nextNodes.find((n) => n.id === edge.source);
+        const tgtNode = nextNodes.find((n) => n.id === edge.target);
+        if (srcNode && tgtNode) {
+          const srcData = srcNode.data as TableNodeData;
+          const tgtData = tgtNode.data as TableNodeData;
+          const srcPK = srcData.columns?.find((c) => c.isPrimary);
+          const tgtFK = tgtData.columns?.find((c) => c.name === `${srcData.name}_id`);
+          if (srcPK && tgtFK) {
+            try {
+              await addRelationship({ data: { id: edge.id, sourceTableId: edge.source, targetTableId: edge.target, sourceColumnId: srcPK.id, targetColumnId: tgtFK.id, type: edgeData.type || "one-to-many" } });
+            } catch { /* ignore */ }
+          }
+        }
+      }
+      // Upsert positions and columns for all surviving nodes
+      if (nextNodes.length > 0) {
+        await saveNodePositions({ data: { projectId, nodes: nextNodes.map((n) => ({ id: n.id, positionX: n.position.x, positionY: n.position.y })) } });
+        for (const node of nextNodes) {
+          const d = node.data as TableNodeData;
+          try { await updateTable({ data: { id: node.id, projectId, name: d.name, color: d.color } }); } catch { /* ignore */ }
+          if (d.columns?.length) {
+            try { await saveColumns({ data: { tableId: node.id, projectId, columns: d.columns.map((c, i) => ({ ...c, defaultValue: c.defaultValue || undefined, order: i })) } }); } catch { /* ignore */ }
+          }
+        }
+      }
+    },
+    [projectId],
+  );
+
+  const undo = useCallback(async () => {
+    if (historyIndex.current <= 0) return;
+    const prevState = history.current[historyIndex.current];
+    historyIndex.current--;
+    const nextState = history.current[historyIndex.current];
+    setNodes(nextState.nodes);
+    setEdges(nextState.edges);
+    setCanUndo(historyIndex.current > 0);
+    setCanRedo(true);
+    setSaving(true);
+    try { await syncHistoryState(prevState.nodes, prevState.edges, nextState.nodes, nextState.edges); }
+    catch (e) { console.error("Undo sync failed:", e); }
+    finally { setSaving(false); }
+  }, [setNodes, setEdges, syncHistoryState]);
+
+  const redo = useCallback(async () => {
+    if (historyIndex.current >= history.current.length - 1) return;
+    const prevState = history.current[historyIndex.current];
+    historyIndex.current++;
+    const nextState = history.current[historyIndex.current];
+    setNodes(nextState.nodes);
+    setEdges(nextState.edges);
+    setCanUndo(true);
+    setCanRedo(historyIndex.current < history.current.length - 1);
+    setSaving(true);
+    try { await syncHistoryState(prevState.nodes, prevState.edges, nextState.nodes, nextState.edges); }
+    catch (e) { console.error("Redo sync failed:", e); }
+    finally { setSaving(false); }
+  }, [setNodes, setEdges, syncHistoryState]);
+
   // Load from localStorage or database on mount
   useEffect(() => {
     if (project && !initialLoadDone.current) {
@@ -210,8 +326,15 @@ function ERDCanvas({ params }: { params: { projectId: string } }) {
           // Use localStorage data if it's newer than last sync
           if (storedTime > lastSyncTime) {
             console.log("Loading from localStorage (unsaved changes detected)");
-            setNodes(data.nodes || []);
-            setEdges(data.edges || []);
+            const lsNodes = data.nodes || [];
+            const lsEdges = data.edges || [];
+            setNodes(lsNodes);
+            setEdges(lsEdges);
+            // Push initial state to history
+            history.current = [{ nodes: lsNodes, edges: lsEdges }];
+            historyIndex.current = 0;
+            setCanUndo(false);
+            setCanRedo(false);
             // Sync immediately if there are unsaved changes
             setTimeout(() => syncToDatabase(), 1000);
             return;
@@ -252,6 +375,11 @@ function ERDCanvas({ params }: { params: { projectId: string } }) {
 
       setNodes(dbNodes);
       setEdges(dbEdges);
+      // Push initial state to history
+      history.current = [{ nodes: dbNodes, edges: dbEdges }];
+      historyIndex.current = 0;
+      setCanUndo(false);
+      setCanRedo(false);
 
       // Save to localStorage after loading from DB
       localStorage.setItem(
@@ -331,13 +459,16 @@ function ERDCanvas({ params }: { params: { projectId: string } }) {
           event: "INSERT",
           schema: "public",
           table: "erd_relationships",
-          filter: `source_table_id=in.(${nodes.map((n) => n.id).join(",")})`,
         },
         (payload) => {
           const newRel = payload.new as any;
 
+          // Only handle if it belongs to this project's tables
+          const nodeIds = new Set(nodesRef.current.map((n) => n.id));
+          if (!nodeIds.has(newRel.source_table_id) && !nodeIds.has(newRel.target_table_id)) return;
+
           // Check if this edge already exists
-          const edgeExists = edges.some((e) => e.id === newRel.id);
+          const edgeExists = edgesRef.current.some((e) => e.id === newRel.id);
           if (edgeExists) return;
 
           const newEdge: Edge = {
@@ -370,7 +501,6 @@ function ERDCanvas({ params }: { params: { projectId: string } }) {
           event: "UPDATE",
           schema: "public",
           table: "erd_relationships",
-          filter: `source_table_id=in.(${nodes.map((n) => n.id).join(",")})`,
         },
         (payload) => {
           const updatedRel = payload.new as any;
@@ -415,7 +545,7 @@ function ERDCanvas({ params }: { params: { projectId: string } }) {
     return () => {
       supabase.removeChannel(channel);
     };
-  }, [projectId, nodes, edges, setEdges]);
+  }, [projectId, setEdges]);
 
   // Realtime subscription for tables
   useEffect(() => {
@@ -433,7 +563,7 @@ function ERDCanvas({ params }: { params: { projectId: string } }) {
           const newTable = payload.new as any;
 
           // Check if this node already exists
-          const nodeExists = nodes.some((n) => n.id === newTable.id);
+          const nodeExists = nodesRef.current.some((n) => n.id === newTable.id);
           if (nodeExists) return;
 
           const newNode: Node = {
@@ -496,7 +626,7 @@ function ERDCanvas({ params }: { params: { projectId: string } }) {
           const deletedTable = payload.old as any;
 
           setNodes((nds) => nds.filter((n) => n.id !== deletedTable.id));
-          // toast.info(`Table "${deletedTable.name}" removed by collaborator`);
+          // toast.info(`Table removed by collaborator`);
         },
       )
       .subscribe();
@@ -504,7 +634,7 @@ function ERDCanvas({ params }: { params: { projectId: string } }) {
     return () => {
       supabase.removeChannel(channel);
     };
-  }, [projectId, nodes, setNodes]);
+  }, [projectId, setNodes]);
 
   // Realtime subscription for columns
   useEffect(() => {
@@ -642,7 +772,7 @@ function ERDCanvas({ params }: { params: { projectId: string } }) {
     return () => {
       supabase.removeChannel(channel);
     };
-  }, [projectId, nodes, setNodes]);
+  }, [projectId, setNodes]);
 
   // Debounced position save - now just updates localStorage
   const scheduleSave = useCallback((updatedNodes: Node[]) => {
@@ -781,6 +911,8 @@ function ERDCanvas({ params }: { params: { projectId: string } }) {
             type: "one-to-many",
           },
         });
+        // Push to history after successful connection
+        pushToHistory(nodesRef.current, edgesRef.current);
       } catch (error) {
         console.error("Failed to create relationship:", error);
         toast.error("Failed to create relationship");
@@ -804,63 +936,75 @@ function ERDCanvas({ params }: { params: { projectId: string } }) {
         }
       }
     },
-    [projectId, setEdges, nodes, setNodes, queryClient],
+    [projectId, setEdges, nodes, setNodes, pushToHistory],
   );
 
-  // Delete edge — also removes the FK column from the TARGET (child) table
+  // Delete edge — also removes the FK column from the correct table based on type
   const handleDeleteEdge = useCallback(
     async (edgeId: string) => {
       const edge = edges.find((e) => e.id === edgeId);
       if (!edge) return;
 
+      const edgeType = (edge.data as any)?.type || "one-to-many";
       const sourceNode = nodes.find((n) => n.id === edge.source);
       const targetNode = nodes.find((n) => n.id === edge.target);
 
       let fkColumnName: string | null = null;
+      let fkTableId: string | null = null;
       let originalColumns: any[] = [];
 
       if (sourceNode && targetNode) {
         const sourceTableData = sourceNode.data as TableNodeData;
         const targetTableData = targetNode.data as TableNodeData;
 
-        // FK column is in the TARGET (child) table, named after the SOURCE (parent)
-        fkColumnName = `${sourceTableData.name}_id`;
-        originalColumns = targetTableData.columns || [];
+        if (edgeType === "many-to-many") {
+          // No FK columns in either table (junction table is export-only)
+          fkColumnName = null;
+        } else if (edgeType === "many-to-one") {
+          // FK is in SOURCE table, named after TARGET
+          fkColumnName = `${targetTableData.name}_id`;
+          fkTableId = edge.source;
+          originalColumns = sourceTableData.columns || [];
+        } else {
+          // one-to-one, one-to-many: FK is in TARGET table, named after SOURCE
+          fkColumnName = `${sourceTableData.name}_id`;
+          fkTableId = edge.target;
+          originalColumns = targetTableData.columns || [];
+        }
 
-        const updatedColumns = originalColumns.filter(
-          (col) => col.name !== fkColumnName,
-        );
-
-        // OPTIMISTIC UPDATE: Remove FK column from UI
-        setNodes((nds) =>
-          nds.map((n) =>
-            n.id === edge.target
-              ? {
-                  ...n,
-                  data: {
-                    ...n.data,
-                    columns: [...updatedColumns],
-                  },
-                }
-              : n,
-          ),
-        );
+        if (fkColumnName && fkTableId) {
+          const updatedColumns = originalColumns.filter(
+            (col) => col.name !== fkColumnName,
+          );
+          setNodes((nds) =>
+            nds.map((n) =>
+              n.id === fkTableId
+                ? { ...n, data: { ...n.data, columns: [...updatedColumns] } }
+                : n,
+            ),
+          );
+        }
       }
+
+      // Snapshot before for potential revert
+      const prevNodes = nodesRef.current.map((n) => ({ ...n, data: { ...n.data } }));
+      const prevEdges = edgesRef.current.map((e) => ({ ...e, data: { ...e.data } }));
 
       // OPTIMISTIC UPDATE: Remove edge from UI
       setEdges((eds) => eds.filter((e) => e.id !== edgeId));
 
       // Save to database with error handling
       try {
-        if (sourceNode && targetNode && fkColumnName) {
-          const targetTableData = targetNode.data as TableNodeData;
-          const updatedColumns = (targetTableData.columns || []).filter(
+        if (sourceNode && targetNode && fkColumnName && fkTableId) {
+          const fkNode = fkTableId === edge.source ? sourceNode : targetNode;
+          const fkTableData = fkNode.data as TableNodeData;
+          const updatedColumns = (fkTableData.columns || []).filter(
             (col) => col.name !== fkColumnName,
           );
 
           await saveColumns({
             data: {
-              tableId: edge.target,
+              tableId: fkTableId,
               projectId,
               columns: updatedColumns.map((c, i) => ({
                 id: c.id,
@@ -877,30 +1021,28 @@ function ERDCanvas({ params }: { params: { projectId: string } }) {
         }
 
         await deleteRelationship({ data: { id: edgeId, projectId } });
+
+        // Push state to history after successful delete
+        const newEdges = edgesRef.current.filter((e) => e.id !== edgeId);
+        pushToHistory(nodesRef.current, newEdges);
       } catch (error) {
         console.error("Failed to delete relationship:", error);
         toast.error("Failed to delete relationship");
 
         // REVERT: Restore edge and FK column on error
         setEdges((eds) => [...eds, edge]);
-        if (sourceNode && targetNode && fkColumnName) {
+        if (fkTableId) {
           setNodes((nds) =>
             nds.map((n) =>
-              n.id === edge.target
-                ? {
-                    ...n,
-                    data: {
-                      ...n.data,
-                      columns: originalColumns,
-                    },
-                  }
+              n.id === fkTableId
+                ? { ...n, data: { ...n.data, columns: originalColumns } }
                 : n,
             ),
           );
         }
       }
     },
-    [projectId, setEdges, edges, nodes, setNodes, queryClient],
+    [projectId, setEdges, edges, nodes, setNodes, pushToHistory],
   );
 
   // Update edge type — also moves FK column to the correct table
@@ -913,6 +1055,14 @@ function ERDCanvas({ params }: { params: { projectId: string } }) {
       if (!edge) return;
 
       const oldType = (edge.data as any)?.type || "one-to-many";
+
+      // Warn user about many-to-many requiring a junction table
+      if (newType === "many-to-many") {
+        toast.info(
+          "Many-to-many relationships require a junction table. Consider creating a join table manually (e.g. user_roles) with foreign keys to both tables.",
+          { duration: 6000 },
+        );
+      }
 
       // Determine which table currently has the FK column and which should have it
       // "many" side holds the FK. For one-to-one and one-to-many, FK is on target.
@@ -1119,18 +1269,23 @@ function ERDCanvas({ params }: { params: { projectId: string } }) {
 
             // STEP 3: Now safe to remove old FK column
             if (oldFKSide === "source" && newFKSide !== "source") {
-              // Remove FK from source table - get fresh data
-              setNodes((nds) => {
-                const freshSourceNode = nds.find((n) => n.id === edge.source);
-                if (!freshSourceNode) return nds;
-
+              // Remove FK from source table - use nodesRef for fresh data
+              const freshSourceNode = nodesRef.current.find((n) => n.id === edge.source);
+              if (freshSourceNode) {
                 const freshSourceData = freshSourceNode.data as TableNodeData;
                 const columnsWithoutFK = (freshSourceData.columns || []).filter(
                   (col) => col.name !== targetFKName,
                 );
 
-                // Save to database
-                saveColumns({
+                setNodes((nds) =>
+                  nds.map((n) =>
+                    n.id === edge.source
+                      ? { ...n, data: { ...n.data, columns: columnsWithoutFK } }
+                      : n,
+                  ),
+                );
+
+                await saveColumns({
                   data: {
                     tableId: edge.source,
                     projectId,
@@ -1145,32 +1300,26 @@ function ERDCanvas({ params }: { params: { projectId: string } }) {
                       order: i,
                     })),
                   },
-                }).catch((error) => {
-                  console.error("Failed to remove old FK from source:", error);
                 });
-
-                return nds.map((n) =>
-                  n.id === edge.source
-                    ? {
-                        ...n,
-                        data: { ...n.data, columns: columnsWithoutFK },
-                      }
-                    : n,
-                );
-              });
+              }
             } else if (oldFKSide === "target" && newFKSide !== "target") {
-              // Remove FK from target table - get fresh data
-              setNodes((nds) => {
-                const freshTargetNode = nds.find((n) => n.id === edge.target);
-                if (!freshTargetNode) return nds;
-
+              // Remove FK from target table - use nodesRef for fresh data
+              const freshTargetNode = nodesRef.current.find((n) => n.id === edge.target);
+              if (freshTargetNode) {
                 const freshTargetData = freshTargetNode.data as TableNodeData;
                 const columnsWithoutFK = (freshTargetData.columns || []).filter(
                   (col) => col.name !== sourceFKName,
                 );
 
-                // Save to database
-                saveColumns({
+                setNodes((nds) =>
+                  nds.map((n) =>
+                    n.id === edge.target
+                      ? { ...n, data: { ...n.data, columns: columnsWithoutFK } }
+                      : n,
+                  ),
+                );
+
+                await saveColumns({
                   data: {
                     tableId: edge.target,
                     projectId,
@@ -1185,19 +1334,8 @@ function ERDCanvas({ params }: { params: { projectId: string } }) {
                       order: i,
                     })),
                   },
-                }).catch((error) => {
-                  console.error("Failed to remove old FK from target:", error);
                 });
-
-                return nds.map((n) =>
-                  n.id === edge.target
-                    ? {
-                        ...n,
-                        data: { ...n.data, columns: columnsWithoutFK },
-                      }
-                    : n,
-                );
-              });
+              }
             }
           } catch (error) {
             console.error("Failed to update relationship type:", error);
@@ -1251,7 +1389,7 @@ function ERDCanvas({ params }: { params: { projectId: string } }) {
         }
       }
     },
-    [projectId, setEdges, edges, nodes, setNodes, queryClient],
+    [projectId, setEdges, edges, nodes, setNodes, pushToHistory],
   );
 
   // Update edges to include delete and type change handlers
@@ -1312,6 +1450,7 @@ function ERDCanvas({ params }: { params: { projectId: string } }) {
         },
       });
       toast.success("Table added");
+      pushToHistory(nodesRef.current, edgesRef.current);
     } catch (error) {
       console.error("Failed to add table:", error);
       // Revert optimistic update on error
@@ -1411,6 +1550,7 @@ function ERDCanvas({ params }: { params: { projectId: string } }) {
       // Delete the table (this will cascade delete relationships and columns)
       await deleteTable({ data: { id: tableId, projectId } });
       toast.success("Table deleted");
+      pushToHistory(nodesRef.current, edgesRef.current);
     } catch (error) {
       console.error("Failed to delete table:", error);
       toast.error("Failed to delete table");
@@ -1519,11 +1659,30 @@ function ERDCanvas({ params }: { params: { projectId: string } }) {
       });
 
       toast.success("Table saved");
+      pushToHistory(nodesRef.current, edgesRef.current);
     } catch (error) {
       console.error("Failed to save table:", error);
       toast.error("Failed to save table");
     }
   };
+
+  // Keyboard shortcuts for undo/redo
+  useEffect(() => {
+    const handleKeyDown = (e: KeyboardEvent) => {
+      if ((e.metaKey || e.ctrlKey) && e.key === "z" && !e.shiftKey) {
+        e.preventDefault();
+        undo();
+      } else if (
+        (e.metaKey || e.ctrlKey) &&
+        (e.key === "y" || (e.key === "z" && e.shiftKey))
+      ) {
+        e.preventDefault();
+        redo();
+      }
+    };
+    window.addEventListener("keydown", handleKeyDown);
+    return () => window.removeEventListener("keydown", handleKeyDown);
+  }, [undo, redo]);
 
   // Auto-layout (simple grid)
   const handleAutoLayout = () => {
@@ -1784,6 +1943,35 @@ function ERDCanvas({ params }: { params: { projectId: string } }) {
             <span>·</span>
             <span>{edges.length} relationships</span>
           </div>
+
+          {/* Undo / Redo — top center */}
+          <div className="absolute left-1/2 -translate-x-1/2 flex items-center gap-1">
+            <Button
+              variant="ghost"
+              size="sm"
+              onClick={undo}
+              disabled={!canUndo}
+              title="Undo (Ctrl+Z)"
+              className="h-7 w-7 p-0 text-muted-foreground"
+            >
+              <svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                <path d="M3 7v6h6" /><path d="M21 17a9 9 0 0 0-9-9 9 9 0 0 0-6 2.3L3 13" />
+              </svg>
+            </Button>
+            <Button
+              variant="ghost"
+              size="sm"
+              onClick={redo}
+              disabled={!canRedo}
+              title="Redo (Ctrl+Y)"
+              className="h-7 w-7 p-0 text-muted-foreground"
+            >
+              <svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                <path d="M21 7v6h-6" /><path d="M3 17a9 9 0 0 1 9-9 9 9 0 0 1 6 2.3L21 13" />
+              </svg>
+            </Button>
+          </div>
+
           <div className="flex items-center gap-2">
             {saving && (
               <span className="text-xs flex items-center gap-1.5 text-muted-foreground">
