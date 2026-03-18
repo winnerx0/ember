@@ -1213,7 +1213,7 @@ function ERDCanvas({ params }: { params: { projectId: string } }) {
                 const existingFK = (sourceData.columns || []).find(
                   (col) => col.name === targetFKName,
                 );
-                newSourceColumnId = existingFK?.id;
+                newSourceColumnId = existingFK?.id ?? "";
                 newTargetColumnId = targetPK?.id;
               }
             } else if (newFKSide === "target") {
@@ -1276,7 +1276,7 @@ function ERDCanvas({ params }: { params: { projectId: string } }) {
                   (col) => col.name === sourceFKName,
                 );
                 newSourceColumnId = sourcePK?.id;
-                newTargetColumnId = existingFK?.id;
+                newTargetColumnId = existingFK?.id ?? "";
               }
             }
 
