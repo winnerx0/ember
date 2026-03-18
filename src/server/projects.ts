@@ -89,7 +89,7 @@ export async function getProject({ data }: { data: { id: string } }) {
         nullable: col.nullable,
         isPrimary: col.is_primary,
         isUnique: col.is_unique,
-        defaultValue: col.default_value,
+        defaultValue: col.default_value ?? "",
         order: col.order,
       })),
   }));
@@ -102,6 +102,8 @@ export async function getProject({ data }: { data: { id: string } }) {
       id: rel.id,
       sourceTableId: rel.source_table_id,
       targetTableId: rel.target_table_id,
+      sourceColumnId: rel.source_column_id,
+      targetColumnId: rel.target_column_id,
       type: rel.type,
       label: rel.label,
     })),

@@ -27,7 +27,7 @@ import {
   deleteTable,
   saveNodePositions,
 } from "~/server/tables";
-import { saveColumns } from "~/server/columns";
+import { saveColumns, saveColumnsBatch } from "~/server/columns";
 import {
   addRelationship,
   deleteRelationship,
@@ -37,6 +37,7 @@ import { TableNode, type TableNodeData } from "~/components/erd/TableNode";
 import { RelationshipEdge } from "~/components/erd/RelationshipEdge";
 import { ColumnEditor, type ColumnDraft } from "~/components/erd/ColumnEditor";
 import { ExportModal } from "~/components/erd/ExportModal";
+import { ImportModal } from "~/components/erd/ImportModal";
 import { ThemeToggle } from "~/components/ThemeToggle";
 import { ConfirmModal } from "~/components/ui/confirm-modal";
 import { supabase } from "~/lib/supabase";
@@ -73,6 +74,7 @@ function ERDCanvas({ params }: { params: { projectId: string } }) {
   const [edges, setEdges, onEdgesChange] = useEdgesState<Edge>([]);
   const [selectedTableId, setSelectedTableId] = useState<string | null>(null);
   const [showExport, setShowExport] = useState(false);
+  const [showImport, setShowImport] = useState(false);
   const [addingTable, setAddingTable] = useState(false);
   const [newTableName, setNewTableName] = useState("");
   const [saving, setSaving] = useState(false);
@@ -134,68 +136,76 @@ function ERDCanvas({ params }: { params: { projectId: string } }) {
 
   // Sync to database every 5 minutes
   const syncToDatabase = useCallback(async () => {
-    if (!initialLoadDone.current || nodes.length === 0) return;
+    const currentNodes = nodesRef.current;
+    const currentEdges = edgesRef.current;
+    if (!initialLoadDone.current || currentNodes.length === 0) return;
 
     setSaving(true);
     try {
-      // Save all node positions
-      await saveNodePositions({
-        data: {
-          projectId,
-          nodes: nodes.map((n) => ({
-            id: n.id,
-            positionX: n.position.x,
-            positionY: n.position.y,
-          })),
-        },
-      });
-
-      // Save all table data and columns
-      for (const node of nodes) {
-        const tableData = node.data as TableNodeData;
-
-        // Update table
-        await updateTable({
+      // Run all three syncs in parallel: positions, table metadata, columns
+      await Promise.all([
+        // 1 request: batch update all positions
+        saveNodePositions({
           data: {
-            id: node.id,
             projectId,
-            name: tableData.name,
-            color: tableData.color,
+            nodes: currentNodes.map((n) => {
+              const d = n.data as TableNodeData;
+              return {
+                id: n.id,
+                name: d.name,
+                color: d.color,
+                positionX: n.position.x,
+                positionY: n.position.y,
+              };
+            }),
           },
-        });
+        }),
 
-        // Save columns
-        if (tableData.columns && tableData.columns.length > 0) {
-          await saveColumns({
-            data: {
-              tableId: node.id,
-              projectId,
-              columns: tableData.columns.map((c, i) => ({
-                id: c.id,
-                name: c.name,
-                type: c.type,
-                nullable: c.nullable,
-                isPrimary: c.isPrimary,
-                isUnique: c.isUnique,
-                defaultValue: c.defaultValue || undefined,
-                order: i,
-              })),
-            },
-          });
-        }
-      }
+        // 1 request per table for name/color (batched via Promise.all)
+        Promise.all(
+          currentNodes.map((node) => {
+            const tableData = node.data as TableNodeData;
+            return updateTable({
+              data: { id: node.id, projectId, name: tableData.name, color: tableData.color },
+            });
+          }),
+        ),
 
-      // Save all relationships
-      for (const edge of edges) {
-        const edgeData = edge.data as any;
-        await updateRelationship({
-          data: {
-            id: edge.id,
-            projectId,
-            type: edgeData.type,
-          },
-        });
-      }
+        // 3 requests total for ALL columns across all tables (GET + DELETE + UPSERT)
+        saveColumnsBatch({
+          data: currentNodes
+            .filter((n) => {
+              const d = n.data as TableNodeData;
+              return d.columns && d.columns.length > 0;
+            })
+            .map((n) => {
+              const d = n.data as TableNodeData;
+              return {
+                tableId: n.id,
+                columns: d.columns.map((c, i) => ({
+                  id: c.id,
+                  name: c.name,
+                  type: c.type,
+                  nullable: c.nullable,
+                  isPrimary: c.isPrimary,
+                  isUnique: c.isUnique,
+                  defaultValue: c.defaultValue || undefined,
+                  order: i,
+                })),
+              };
+            }),
+        }),
+
+        // 1 request per relationship (batched via Promise.all)
+        Promise.all(
+          currentEdges.map((edge) => {
+            const edgeData = edge.data as any;
+            return updateRelationship({
+              data: { id: edge.id, projectId, type: edgeData.type },
+            });
+          }),
+        ),
+      ]);
 
       localStorage.setItem(LAST_SYNC_KEY, Date.now().toString());
       console.log("Synced to database at", new Date().toLocaleTimeString());
@@ -204,7 +214,7 @@ function ERDCanvas({ params }: { params: { projectId: string } }) {
     } finally {
       setSaving(false);
     }
-  }, [nodes, edges, projectId, LAST_SYNC_KEY]);
+  }, [projectId, LAST_SYNC_KEY]);
 
   // Push a snapshot to undo history after every significant operation
   const pushToHistory = useCallback((newNodes: Node[], newEdges: Edge[]) => {
@@ -370,6 +380,8 @@ function ERDCanvas({ params }: { params: { projectId: string } }) {
           type: rel.type,
           label: rel.label,
           projectId,
+          sourceColumnId: rel.sourceColumnId,
+          targetColumnId: rel.targetColumnId,
         },
       }));
 
@@ -814,44 +826,63 @@ function ERDCanvas({ params }: { params: { projectId: string } }) {
       const targetTableData = targetNode.data as TableNodeData;
 
       // FK column lives in the TARGET (child) table, referencing the SOURCE (parent/owner).
-      // Naming convention: sourceTableName_id
-      const fkColumnName = `${sourceTableData.name}_id`;
+      // Fall back to first column if no single primary key is marked (e.g. composite PK tables).
+      const sourcePK =
+        sourceTableData.columns?.find((col) => col.isPrimary) ??
+        sourceTableData.columns?.[0];
+      const sourcePKType = sourcePK?.type ?? "uuid";
+      const sourceSingular = (() => {
+        const n = sourceTableData.name;
+        if (n.endsWith("ies")) return n.slice(0, -3) + "y";
+        if (n.endsWith("ses") || n.endsWith("xes") || n.endsWith("zes")) return n.slice(0, -2);
+        if (n.endsWith("s")) return n.slice(0, -1);
+        return n;
+      })();
 
-      // Check if FK column already exists in the target (child) table
-      const fkExists = targetTableData.columns?.some(
-        (col) => col.name === fkColumnName,
-      );
+      // Find existing FK column: prefer name match, fall back to type match
+      const targetCols = targetTableData.columns || [];
+      const existingFKCol =
+        targetCols.find(
+          (col) =>
+            !col.isPrimary &&
+            (col.name === `${sourceTableData.name}_id` ||
+              col.name === `${sourceSingular}_id`),
+        ) ??
+        targetCols.find(
+          (col) =>
+            !col.isPrimary &&
+            col.type === sourcePKType &&
+            (col.name.startsWith(sourceTableData.name) ||
+              col.name.startsWith(sourceSingular)),
+        ) ??
+        targetCols.find((col) => !col.isPrimary && col.type === sourcePKType);
 
-      let updatedTargetColumns = targetTableData.columns || [];
+      const fkExists = !!existingFKCol;
+      const fkColumnName = existingFKCol?.name ?? `${sourceSingular}_id`;
+
+      let updatedTargetColumns = targetCols;
       let newFkColumn = null;
 
       if (!fkExists) {
-        // Match the type of the source table's primary key
-        const sourcePK = sourceTableData.columns?.find((col) => col.isPrimary);
-        const fkType = sourcePK?.type || "uuid";
-
         newFkColumn = {
           id: crypto.randomUUID(),
           name: fkColumnName,
-          type: fkType,
+          type: sourcePKType,
           isPrimary: false,
           isUnique: false,
           nullable: false,
           defaultValue: null,
           order: updatedTargetColumns.length,
         };
-
         updatedTargetColumns = [...updatedTargetColumns, newFkColumn];
       }
 
-      // Get the source PK column and target FK column IDs
-      const sourcePK = sourceTableData.columns?.find((col) => col.isPrimary);
       const targetFK = updatedTargetColumns.find(
         (col) => col.name === fkColumnName,
       );
 
       if (!sourcePK || !targetFK) {
-        console.error("Missing source PK or target FK column");
+        toast.error("Cannot connect: source table has no columns.");
         return;
       }
 
@@ -1097,12 +1128,22 @@ function ERDCanvas({ params }: { params: { projectId: string } }) {
         if (sourceNode && targetNode) {
           const sourceData = sourceNode.data as TableNodeData;
           const targetData = targetNode.data as TableNodeData;
-          const sourcePK = sourceData.columns?.find((col) => col.isPrimary);
-          const targetPK = targetData.columns?.find((col) => col.isPrimary);
+          const sourcePK =
+            sourceData.columns?.find((col) => col.isPrimary) ??
+            sourceData.columns?.[0];
+          const targetPK =
+            targetData.columns?.find((col) => col.isPrimary) ??
+            targetData.columns?.[0];
 
-          // FK column names
-          const sourceFKName = `${sourceData.name}_id`;
-          const targetFKName = `${targetData.name}_id`;
+          // FK column names (use singular form, e.g. categories → category_id)
+          const toSingular = (n: string) => {
+            if (n.endsWith("ies")) return n.slice(0, -3) + "y";
+            if (n.endsWith("ses") || n.endsWith("xes") || n.endsWith("zes")) return n.slice(0, -2);
+            if (n.endsWith("s")) return n.slice(0, -1);
+            return n;
+          };
+          const sourceFKName = `${toSingular(sourceData.name)}_id`;
+          const targetFKName = `${toSingular(targetData.name)}_id`;
 
           // Track the new column IDs for the relationship
           let newSourceColumnId = sourcePK?.id;
@@ -1177,7 +1218,7 @@ function ERDCanvas({ params }: { params: { projectId: string } }) {
                 const existingFK = (sourceData.columns || []).find(
                   (col) => col.name === targetFKName,
                 );
-                newSourceColumnId = existingFK?.id;
+                newSourceColumnId = existingFK?.id ?? "";
                 newTargetColumnId = targetPK?.id;
               }
             } else if (newFKSide === "target") {
@@ -1240,21 +1281,21 @@ function ERDCanvas({ params }: { params: { projectId: string } }) {
                   (col) => col.name === sourceFKName,
                 );
                 newSourceColumnId = sourcePK?.id;
-                newTargetColumnId = existingFK?.id;
+                newTargetColumnId = existingFK?.id ?? "";
               }
             }
 
             // STEP 2: Update the relationship with new column IDs BEFORE deleting old FK
             // This prevents CASCADE delete from removing the relationship
             if (!newSourceColumnId || !newTargetColumnId) {
-              console.error("Missing column IDs for relationship update", {
-                newSourceColumnId,
-                newTargetColumnId,
-                newType,
-                sourcePK,
-                targetPK,
-              });
-              throw new Error("Missing column IDs for relationship update");
+              toast.error("Cannot update relationship: one of the tables has no columns.");
+              // Revert optimistic edge type change
+              setEdges((eds) =>
+                eds.map((e) =>
+                  e.id === edgeId ? { ...e, data: { ...e.data, type: oldType } } : e,
+                ),
+              );
+              return;
             }
 
             await updateRelationship({
@@ -1721,7 +1762,7 @@ function ERDCanvas({ params }: { params: { projectId: string } }) {
           sidebarOpen ? "w-56" : "w-0 border-r-0",
         )}
       >
-        <div className={clsx("w-56", !sidebarOpen && "hidden")}>
+        <div className={clsx("w-56 flex flex-col flex-1 min-h-0", !sidebarOpen && "hidden")}>
           {/* Logo */}
           <div className="px-4 py-3 border-b flex items-center justify-between border-border">
             <Link
@@ -1889,7 +1930,7 @@ function ERDCanvas({ params }: { params: { projectId: string } }) {
           </div>
 
           {/* Bottom actions */}
-          <div className="p-3 border-t space-y-2 border-border mt-auto absolute bottom-0">
+          <div className="p-3 border-t space-y-2 border-border mt-auto">
             <Button
               onClick={handleAutoLayout}
               variant="outline"
@@ -1897,6 +1938,14 @@ function ERDCanvas({ params }: { params: { projectId: string } }) {
               className="w-full h-8 text-xs"
             >
               ⊞ Auto Layout
+            </Button>
+            <Button
+              onClick={() => setShowImport(true)}
+              variant="outline"
+              size="sm"
+              className="w-full h-8 text-xs"
+            >
+              ↑ Import YAML
             </Button>
             <Button
               onClick={() => setShowExport(true)}
@@ -2066,6 +2115,53 @@ function ERDCanvas({ params }: { params: { projectId: string } }) {
           })}
           onSave={handleSaveTable}
           onClose={() => setSelectedTableId(null)}
+        />
+      )}
+
+      {/* Import modal */}
+      {showImport && (
+        <ImportModal
+          projectId={projectId}
+          projectName={project.name}
+          onClose={() => setShowImport(false)}
+          onImported={async () => {
+            // Reload project data from database
+            const freshProject = await getProject({ data: { id: projectId } });
+            const newNodes: Node[] = freshProject.tables.map((table: any, i: number) => ({
+              id: table.id,
+              type: "tableNode",
+              position: { x: table.positionX, y: table.positionY },
+              data: {
+                id: table.id,
+                name: table.name,
+                color: table.color,
+                projectId,
+                columns: table.columns || [],
+              } as TableNodeData,
+            }));
+            const newEdges: Edge[] = freshProject.relationships.map((rel: any) => ({
+              id: rel.id,
+              source: rel.sourceTableId,
+              target: rel.targetTableId,
+              sourceHandle: `${rel.sourceTableId}-table-source`,
+              targetHandle: `${rel.targetTableId}-table-target`,
+              type: "relationship",
+              data: {
+                type: rel.type,
+                label: rel.label,
+                projectId,
+                sourceColumnId: rel.sourceColumnId,
+                targetColumnId: rel.targetColumnId,
+              },
+            }));
+            setNodes(newNodes);
+            setEdges(newEdges);
+            pushToHistory(newNodes, newEdges);
+            localStorage.setItem(STORAGE_KEY, JSON.stringify({ nodes: newNodes, edges: newEdges, timestamp: Date.now() }));
+            localStorage.setItem(LAST_SYNC_KEY, Date.now().toString());
+            toast.success("Schema imported from YAML");
+            setTimeout(() => reactFlowInstance.fitView({ padding: 0.15, duration: 400 }), 100);
+          }}
         />
       )}
 

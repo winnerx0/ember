@@ -72,21 +72,26 @@ export async function saveNodePositions({
 }: {
   data: {
     projectId: string;
-    nodes: Array<{ id: string; positionX: number; positionY: number }>;
+    nodes: Array<{ id: string; name: string; color: string; positionX: number; positionY: number }>;
   };
 }) {
-  for (const node of data.nodes) {
-    const { error } = await supabase
-      .from("erd_tables")
-      .update({
+  if (data.nodes.length === 0) return { success: true };
+
+  // Single batch upsert for all positions
+  const { error } = await supabase
+    .from("erd_tables")
+    .upsert(
+      data.nodes.map((node) => ({
+        id: node.id,
+        project_id: data.projectId,
+        name: node.name,
+        color: node.color,
         position_x: node.positionX,
         position_y: node.positionY,
-      })
-      .eq("id", node.id)
-      .eq("project_id", data.projectId);
+      })),
+      { onConflict: "id", ignoreDuplicates: false },
+    );
 
-    if (error) throw error;
-  }
-
+  if (error) throw error;
   return { success: true };
 }
