@@ -8,11 +8,12 @@ A visual PostgreSQL schema designer built for developers who want to design data
 ## Features
 
 - **Visual ERD Designer** - Drag, drop, and connect tables on an infinite canvas powered by React Flow
+- **YAML Import** - Import your entire database schema from a structured YAML file with automatic table, column, and relationship creation
 - **Smart Relationships** - Draw foreign key relationships with automatic column management (one-to-one, one-to-many, many-to-one, many-to-many)
 - **SQL Export** - Generate production-ready PostgreSQL DDL with CREATE TABLE, FOREIGN KEY constraints, junction tables, and CASCADE rules
 - **Realtime Collaboration** - See changes from other users instantly with Supabase Realtime subscriptions
 - **Optimistic Updates** - Instant UI feedback with automatic rollback on errors
-- **Rich Column Types** - Full PostgreSQL type support including UUID, JSONB, TIMESTAMPTZ, arrays, and more
+- **Rich Column Types** - Full PostgreSQL type support including UUID, SERIAL, INTEGER, DECIMAL, JSONB, TIMESTAMPTZ, and more
 - **Auto Layout** - One-click intelligent table arrangement with zoom, pan, and minimap
 - **Collapsible Sidebar** - Toggle sidebar visibility for maximum canvas space
 - **User Profiles** - Integrated user menu with settings and authentication
@@ -125,6 +126,55 @@ bun run dev
 2. Confirm the deletion
 3. All foreign key columns referencing the deleted table are automatically removed from other tables
 
+### Importing from YAML
+
+1. Click "Import YAML" in the sidebar
+2. Paste your schema YAML or type it directly — syntax is highlighted in real time
+3. Click "Import" to create all tables, columns, and relationships at once
+4. Errors are shown inline before import (unknown types, missing tables, etc.)
+
+YAML schema format:
+
+```yaml
+version: "1.0"
+
+tables:
+  users:
+    columns:
+      id:
+        type: uuid
+        primary: true
+        default: gen_random_uuid()
+      email:
+        type: text
+        unique: true
+
+  posts:
+    columns:
+      id:
+        type: uuid
+        primary: true
+        default: gen_random_uuid()
+      user_id:
+        type: uuid
+      title:
+        type: text
+
+relationships:
+  - from: users
+    to: posts
+    type: one-to-many
+
+  # Many-to-many via an explicit junction table
+  - from: posts
+    to: tags
+    type: many-to-many
+    via: post_tags
+```
+
+Supported column properties: `type`, `primary`, `unique`, `nullable`, `default`.
+Supported types: `uuid`, `serial`, `bigserial`, `integer`, `int`, `bigint`, `smallint`, `numeric`, `decimal`, `real`, `double precision`, `boolean`, `text`, `varchar`, `char`, `date`, `timestamp`, `timestamptz`, `json`, `jsonb`, `bytea`.
+
 ### Exporting SQL
 
 1. Click "Export SQL" in the sidebar
@@ -164,10 +214,11 @@ ember/
 │   │   ├── page.tsx             
 │   │   └── providers.tsx     
 │   ├── components/
-│   │   ├── erd/             
+│   │   ├── erd/
 │   │   │   ├── TableNode.tsx
 │   │   │   ├── ColumnEditor.tsx
 │   │   │   ├── RelationshipEdge.tsx
+│   │   │   ├── ImportModal.tsx
 │   │   │   └── ExportModal.tsx
 │   │   ├── ui/                   
 │   │   ├── ThemeToggle.tsx
@@ -175,12 +226,13 @@ ember/
 │   ├── lib/
 │   │   ├── supabase.ts          
 │   │   └── utils.ts             
-│   ├── server/                  
+│   ├── server/
 │   │   ├── auth.ts
 │   │   ├── projects.ts
 │   │   ├── tables.ts
 │   │   ├── columns.ts
 │   │   ├── relationships.ts
+│   │   ├── import.ts
 │   │   └── export.ts
 │   └── middleware.ts          
 ├── next.config.ts
