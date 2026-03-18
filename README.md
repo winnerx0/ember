@@ -1,5 +1,9 @@
 # Ember
 
+<p align="center">
+  <img src="public/logo.jpg" alt="Ember Logo" width="80" style="border-radius: 12px" />
+</p>
+
 A visual PostgreSQL schema designer built for developers who want to design databases visually and export production-ready SQL.
 
 ![Ember Banner](https://img.shields.io/badge/PostgreSQL-ERD_Designer-blue?style=for-the-badge&logo=postgresql)
