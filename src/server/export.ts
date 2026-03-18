@@ -8,9 +8,11 @@ function toSQLType(type: string): string {
     serial: "SERIAL",
     bigserial: "BIGSERIAL",
     integer: "INTEGER",
+    int: "INT",
     bigint: "BIGINT",
     smallint: "SMALLINT",
     numeric: "NUMERIC",
+    decimal: "DECIMAL",
     real: "REAL",
     "double precision": "DOUBLE PRECISION",
     boolean: "BOOLEAN",
@@ -131,17 +133,26 @@ export async function exportSQL({ data }: { data: { projectId: string } }) {
       let targetCol = (columns || []).find((c) => c.id === rel.target_column_id);
 
       // Fallback: find by naming convention if IDs are stale
+      const singularize = (w: string) => {
+        if (w.endsWith("ies")) return w.slice(0, -3) + "y";
+        if (w.endsWith("ses") || w.endsWith("xes") || w.endsWith("zes")) return w.slice(0, -2);
+        if (w.endsWith("s")) return w.slice(0, -1);
+        return w;
+      };
       if (!sourceCol && sourceTable) {
         sourceCol = (columns || []).find(
           (c) => c.table_id === sourceTable.id && c.is_primary,
         );
       }
       if (!targetCol && targetTable && sourceTable) {
-        targetCol = (columns || []).find(
-          (c) =>
-            c.table_id === targetTable.id &&
-            c.name === `${sourceTable.name}_id`,
-        );
+        const singular = singularize(sourceTable.name);
+        targetCol =
+          (columns || []).find(
+            (c) => c.table_id === targetTable.id && c.name === `${singular}_id`,
+          ) ??
+          (columns || []).find(
+            (c) => c.table_id === targetTable.id && c.name === `${sourceTable.name}_id`,
+          );
       }
 
       if (!sourceTable || !targetTable || !sourceCol || !targetCol) continue;

@@ -17,9 +17,11 @@ const PG_TYPES = [
   "serial",
   "bigserial",
   "integer",
+  "int",
   "bigint",
   "smallint",
   "numeric",
+  "decimal",
   "real",
   "double precision",
   "boolean",
@@ -430,7 +432,7 @@ export function ColumnEditor({
                       </div>
                       <Input
                         type="text"
-                        value={col.defaultValue}
+                        value={col.defaultValue ?? ""}
                         onChange={(e) =>
                           updateColumn(col.id, "defaultValue", e.target.value)
                         }
