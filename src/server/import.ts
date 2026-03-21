@@ -7,16 +7,21 @@ type YAMLColumn = {
   unique?: boolean;
   nullable?: boolean;
   default?: string;
+  check?: string;
 };
 
 type YAMLTable = {
   columns?: Record<string, YAMLColumn | string>;
+  indexes?: Array<{ columns: string[]; name?: string; unique?: boolean }>;
+  unique?: Array<string[]>;
+  checks?: Array<{ column?: string; expression: string }>;
 };
 
 type YAMLRelationship = {
   from: string;
   to: string;
   type?: "one-to-one" | "one-to-many" | "many-to-one" | "many-to-many";
+  column?: string; // FK column name (in the table that holds the FK)
   via?: string;
 };
 
@@ -28,7 +33,8 @@ type YAMLSchema = {
 const VALID_TYPES = new Set([
   "uuid", "serial", "bigserial", "integer", "int", "bigint", "smallint",
   "numeric", "decimal", "real", "double precision", "boolean", "text", "varchar",
-  "char", "date", "timestamp", "timestamptz", "json", "jsonb", "bytea",
+  "char", "date", "time", "timetz", "timestamp", "timestamptz", "interval",
+  "json", "jsonb", "bytea", "inet", "cidr", "macaddr", "money",
 ]);
 
 const TABLE_COLORS = [
@@ -93,8 +99,12 @@ export function parseYAMLSchema(yamlString: string): {
         }
         // Support shorthand: column_name: type
         const colType = typeof col === "string" ? col : col?.type;
-        if (colType && !VALID_TYPES.has(colType.toLowerCase())) {
-          errors.push(`Unknown type "${colType}" for ${tableName}.${colName}`);
+        if (colType) {
+          // Strip parenthesized parameters, e.g. "varchar(50)" -> "varchar", "numeric(10,2)" -> "numeric"
+          const baseType = colType.toLowerCase().replace(/\(.*\)$/, "").trim();
+          if (!VALID_TYPES.has(baseType)) {
+            errors.push(`Unknown type "${colType}" for ${tableName}.${colName}`);
+          }
         }
       }
     }
@@ -122,6 +132,14 @@ export function parseYAMLSchema(yamlString: string): {
         }
         if (rel.via && !tableNames.has(rel.via)) {
           errors.push(`Relationship ${i + 1}: unknown via table "${rel.via}"`);
+        }
+        // Validate column reference
+        if (rel.column) {
+          const relType = rel.type || "one-to-many";
+          const fkTable = relType === "many-to-one" ? rel.from : rel.to;
+          if (fkTable && parsed.tables[fkTable]?.columns && !(rel.column in parsed.tables[fkTable].columns)) {
+            errors.push(`Relationship ${i + 1}: column "${rel.column}" not found in table "${fkTable}"`);
+          }
         }
       }
     }
@@ -170,6 +188,36 @@ export async function importYAML({
     const row = Math.floor(i / COLS);
     const color = TABLE_COLORS[i % TABLE_COLORS.length];
 
+    const tableDef = schema.tables[tableName];
+
+    // Build metadata from table-level constraints
+    const metadata: Record<string, any> = {};
+
+    // Per-column CHECK constraints
+    const checks: Array<{ column?: string; expression: string }> = [];
+    if (tableDef.columns) {
+      for (const [colName, colDef] of Object.entries(tableDef.columns)) {
+        if (typeof colDef !== "string" && colDef?.check) {
+          checks.push({ column: colName, expression: colDef.check });
+        }
+      }
+    }
+    // Table-level CHECK constraints
+    if (tableDef.checks) {
+      checks.push(...tableDef.checks);
+    }
+    if (checks.length > 0) metadata.checks = checks;
+
+    // Indexes
+    if (tableDef.indexes && tableDef.indexes.length > 0) {
+      metadata.indexes = tableDef.indexes;
+    }
+
+    // Multi-column unique constraints
+    if (tableDef.unique && tableDef.unique.length > 0) {
+      metadata.unique = tableDef.unique;
+    }
+
     const { error } = await supabase
       .from("erd_tables")
       .insert({
@@ -179,6 +227,7 @@ export async function importYAML({
         color,
         position_x: 100 + col * SPACING_X,
         position_y: 100 + row * SPACING_Y,
+        metadata: Object.keys(metadata).length > 0 ? metadata : {},
       });
 
     if (error) throw new Error(`Failed to create table "${tableName}": ${error.message}`);
@@ -290,61 +339,35 @@ export async function importYAML({
         sourceColumnId = sourcePKName ? sourceColMap.get(sourcePKName)! : [...sourceColMap.values()][0];
         targetColumnId = targetPKName ? targetColMap.get(targetPKName)! : [...targetColMap.values()][0];
       } else if (relType === "many-to-one") {
-        // FK in source table referencing target — reuse existing column if present
-        const existingFKName = findFKColumn(schema.tables![rel.from], rel.to);
-        if (existingFKName && sourceColMap.has(existingFKName)) {
-          sourceColumnId = sourceColMap.get(existingFKName)!;
-        } else {
-          const fkColName = `${rel.to}_id`;
-          const fkColId = crypto.randomUUID();
-          const targetPKDef = targetPKName ? schema.tables![rel.to].columns![targetPKName] : null;
-          const fkType = targetPKDef
-            ? (typeof targetPKDef === "string" ? targetPKDef : targetPKDef.type || "uuid")
-            : "uuid";
+        // FK in source table referencing target
+        // Priority: rel.column > findFKColumn
+        const fkColName = rel.column
+          ?? findFKColumn(schema.tables![rel.from], rel.to)
+          ?? null;
 
-          const { error } = await supabase.from("erd_columns").insert({
-            id: fkColId,
-            table_id: sourceTableId,
-            name: fkColName,
-            type: fkType.toLowerCase(),
-            is_primary: false,
-            is_unique: false,
-            nullable: false,
-            default_value: null,
-            order: sourceColMap.size,
-          });
-          if (error) throw new Error(`Failed to create FK column "${fkColName}": ${error.message}`);
-          sourceColMap.set(fkColName, fkColId);
-          sourceColumnId = fkColId;
+        if (fkColName && sourceColMap.has(fkColName)) {
+          sourceColumnId = sourceColMap.get(fkColName)!;
+        } else {
+          // No matching FK column found — skip this relationship
+          // User should add `column: <name>` to the relationship in YAML
+          console.warn(`Skipping relationship ${rel.from} -> ${rel.to}: no FK column found in "${rel.from}". Add \`column: <col_name>\` to the relationship.`);
+          continue;
         }
         targetColumnId = targetPKName ? targetColMap.get(targetPKName)! : [...targetColMap.values()][0];
       } else {
-        // one-to-one, one-to-many: FK in target table referencing source — reuse existing column if present
-        const existingFKName = findFKColumn(schema.tables![rel.to], rel.from);
-        if (existingFKName && targetColMap.has(existingFKName)) {
-          targetColumnId = targetColMap.get(existingFKName)!;
-        } else {
-          const fkColName = `${rel.from}_id`;
-          const fkColId = crypto.randomUUID();
-          const sourcePKDef = sourcePKName ? schema.tables![rel.from].columns![sourcePKName] : null;
-          const fkType = sourcePKDef
-            ? (typeof sourcePKDef === "string" ? sourcePKDef : sourcePKDef.type || "uuid")
-            : "uuid";
+        // one-to-one, one-to-many: FK in target table referencing source
+        // Priority: rel.column > findFKColumn
+        const fkColName = rel.column
+          ?? findFKColumn(schema.tables![rel.to], rel.from)
+          ?? null;
 
-          const { error } = await supabase.from("erd_columns").insert({
-            id: fkColId,
-            table_id: targetTableId,
-            name: fkColName,
-            type: fkType.toLowerCase(),
-            is_primary: false,
-            is_unique: relType === "one-to-one",
-            nullable: false,
-            default_value: null,
-            order: targetColMap.size,
-          });
-          if (error) throw new Error(`Failed to create FK column "${fkColName}": ${error.message}`);
-          targetColMap.set(fkColName, fkColId);
-          targetColumnId = fkColId;
+        if (fkColName && targetColMap.has(fkColName)) {
+          targetColumnId = targetColMap.get(fkColName)!;
+        } else {
+          // No matching FK column found — skip this relationship
+          // User should add `column: <name>` to the relationship in YAML
+          console.warn(`Skipping relationship ${rel.from} -> ${rel.to}: no FK column found in "${rel.to}". Add \`column: <col_name>\` to the relationship.`);
+          continue;
         }
         sourceColumnId = sourcePKName ? sourceColMap.get(sourcePKName)! : [...sourceColMap.values()][0];
       }

@@ -3,6 +3,11 @@ import { format } from "sql-formatter";
 
 // Map column types to proper PostgreSQL SQL syntax
 function toSQLType(type: string): string {
+  // Handle parameterized types like varchar(50), numeric(10,2)
+  const match = type.match(/^([^(]+)(\(.*\))?$/);
+  const base = match?.[1]?.trim().toLowerCase() ?? type.toLowerCase();
+  const params = match?.[2] ?? "";
+
   const map: Record<string, string> = {
     uuid: "UUID",
     serial: "SERIAL",
@@ -20,13 +25,20 @@ function toSQLType(type: string): string {
     varchar: "VARCHAR",
     char: "CHAR",
     date: "DATE",
+    time: "TIME",
+    timetz: "TIMETZ",
     timestamp: "TIMESTAMP",
     timestamptz: "TIMESTAMPTZ",
+    interval: "INTERVAL",
     json: "JSON",
     jsonb: "JSONB",
     bytea: "BYTEA",
+    inet: "INET",
+    cidr: "CIDR",
+    macaddr: "MACADDR",
+    money: "MONEY",
   };
-  return map[type.toLowerCase()] ?? type.toUpperCase();
+  return (map[base] ?? base.toUpperCase()) + params;
 }
 
 export async function exportSQL({ data }: { data: { projectId: string } }) {
@@ -79,16 +91,25 @@ export async function exportSQL({ data }: { data: { projectId: string } }) {
   // CREATE TABLE statements
   for (const table of tables) {
     const tableCols = (columns || []).filter((col) => col.table_id === table.id);
+    const primaryCols = tableCols.filter((col) => col.is_primary);
+    const isCompositePK = primaryCols.length > 1;
 
     sql += `CREATE TABLE "${table.name}" (\n`;
     const colDefs = tableCols.map((col) => {
       let line = `  "${col.name}" ${toSQLType(col.type)}`;
-      if (col.is_primary) line += " PRIMARY KEY";
+      // Only inline PRIMARY KEY for single-column PKs
+      if (col.is_primary && !isCompositePK) line += " PRIMARY KEY";
       if (!col.nullable && !col.is_primary) line += " NOT NULL";
       if (col.is_unique && !col.is_primary) line += " UNIQUE";
       if (col.default_value) line += ` DEFAULT ${col.default_value}`;
       return line;
     });
+
+    // Add composite primary key as table constraint
+    if (isCompositePK) {
+      colDefs.push(`  PRIMARY KEY (${primaryCols.map((c) => `"${c.name}"`).join(", ")})`);
+    }
+
     sql += colDefs.join(",\n");
     sql += `\n);\n\n`;
   }
@@ -174,18 +195,71 @@ export async function exportSQL({ data }: { data: { projectId: string } }) {
         sql += `  FOREIGN KEY ("${targetTable.name}_id") REFERENCES "${targetTable.name}" ("${targetPK.name}") ON DELETE CASCADE;\n\n`;
       } else if (rel.type === "many-to-one") {
         // FK is in SOURCE table referencing TARGET
-        sql += `ALTER TABLE "${sourceTable.name}" ADD CONSTRAINT "fk_${sourceTable.name}_${targetTable.name}"\n`;
+        sql += `ALTER TABLE "${sourceTable.name}" ADD CONSTRAINT "fk_${sourceTable.name}_${sourceCol.name}"\n`;
         sql += `  FOREIGN KEY ("${sourceCol.name}") REFERENCES "${targetTable.name}" ("${targetCol.name}") ON DELETE CASCADE;\n\n`;
       } else if (rel.type === "one-to-one") {
         // FK is in TARGET table, must be UNIQUE
-        sql += `ALTER TABLE "${targetTable.name}" ADD CONSTRAINT "fk_${targetTable.name}_${sourceTable.name}"\n`;
+        sql += `ALTER TABLE "${targetTable.name}" ADD CONSTRAINT "fk_${targetTable.name}_${targetCol.name}"\n`;
         sql += `  FOREIGN KEY ("${targetCol.name}") REFERENCES "${sourceTable.name}" ("${sourceCol.name}") ON DELETE CASCADE;\n\n`;
         sql += `ALTER TABLE "${targetTable.name}" ADD CONSTRAINT "uq_${targetTable.name}_${targetCol.name}"\n`;
         sql += `  UNIQUE ("${targetCol.name}");\n\n`;
       } else {
         // one-to-many: FK is in TARGET table
-        sql += `ALTER TABLE "${targetTable.name}" ADD CONSTRAINT "fk_${targetTable.name}_${sourceTable.name}"\n`;
+        sql += `ALTER TABLE "${targetTable.name}" ADD CONSTRAINT "fk_${targetTable.name}_${targetCol.name}"\n`;
         sql += `  FOREIGN KEY ("${targetCol.name}") REFERENCES "${sourceTable.name}" ("${sourceCol.name}") ON DELETE CASCADE;\n\n`;
+      }
+    }
+  }
+
+  // CHECK constraints, indexes, and multi-column unique constraints from table metadata
+  let hasConstraints = false;
+  let hasIndexes = false;
+
+  for (const table of tables) {
+    const meta = (table as any).metadata || {};
+
+    // CHECK constraints
+    if (meta.checks && Array.isArray(meta.checks)) {
+      if (!hasConstraints) {
+        sql += `-- CHECK Constraints\n`;
+        hasConstraints = true;
+      }
+      for (const check of meta.checks) {
+        const constraintName = check.column
+          ? `chk_${table.name}_${check.column}`
+          : `chk_${table.name}_${meta.checks.indexOf(check)}`;
+        sql += `ALTER TABLE "${table.name}" ADD CONSTRAINT "${constraintName}"\n`;
+        sql += `  CHECK (${check.expression});\n\n`;
+      }
+    }
+
+    // Multi-column unique constraints
+    if (meta.unique && Array.isArray(meta.unique)) {
+      if (!hasConstraints) {
+        sql += `-- Constraints\n`;
+        hasConstraints = true;
+      }
+      for (const cols of meta.unique) {
+        if (Array.isArray(cols) && cols.length > 0) {
+          const constraintName = `uq_${table.name}_${cols.join("_")}`;
+          sql += `ALTER TABLE "${table.name}" ADD CONSTRAINT "${constraintName}"\n`;
+          sql += `  UNIQUE (${cols.map((c: string) => `"${c}"`).join(", ")});\n\n`;
+        }
+      }
+    }
+
+    // Indexes
+    if (meta.indexes && Array.isArray(meta.indexes)) {
+      if (!hasIndexes) {
+        sql += `-- Indexes\n`;
+        hasIndexes = true;
+      }
+      for (const idx of meta.indexes) {
+        if (idx.columns && Array.isArray(idx.columns)) {
+          const indexName = idx.name || `idx_${table.name}_${idx.columns.join("_")}`;
+          const uniquePrefix = idx.unique ? "UNIQUE " : "";
+          sql += `CREATE ${uniquePrefix}INDEX "${indexName}" ON "${table.name}" (${idx.columns.map((c: string) => `"${c}"`).join(", ")});\n\n`;
+        }
       }
     }
   }

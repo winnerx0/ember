@@ -80,6 +80,7 @@ export async function getProject({ data }: { data: { id: string } }) {
     color: table.color,
     positionX: table.position_x,
     positionY: table.position_y,
+    metadata: (table as any).metadata || {},
     columns: columns
       .filter((col) => col.table_id === table.id)
       .map((col) => ({
