@@ -41,11 +41,23 @@ const TYPE_COLORS: Record<string, string> = {
   jsonb: "var(--primary)",
   json: "var(--primary)",
   numeric: "var(--chart-4)",
+  decimal: "var(--chart-4)",
   real: "var(--chart-4)",
+  smallint: "var(--chart-4)",
+  money: "var(--chart-4)",
+  time: "var(--chart-3)",
+  timetz: "var(--chart-3)",
+  interval: "var(--chart-3)",
+  char: "var(--chart-2)",
+  bytea: "var(--primary)",
+  inet: "var(--muted-foreground)",
+  cidr: "var(--muted-foreground)",
+  macaddr: "var(--muted-foreground)",
 };
 
 function getTypeColor(type: string) {
-  return TYPE_COLORS[type.toLowerCase()] || "var(--muted-foreground)";
+  const base = type.toLowerCase().replace(/\(.*\)$/, "");
+  return TYPE_COLORS[base] || "var(--muted-foreground)";
 }
 
 function shortType(type: string) {

@@ -24,16 +24,23 @@ const PG_TYPES = [
   "decimal",
   "real",
   "double precision",
+  "money",
   "boolean",
   "text",
   "varchar",
   "char",
   "date",
+  "time",
+  "timetz",
   "timestamp",
   "timestamptz",
+  "interval",
   "json",
   "jsonb",
   "bytea",
+  "inet",
+  "cidr",
+  "macaddr",
 ];
 
 // Suggested default values per PostgreSQL type
@@ -43,12 +50,16 @@ function getSuggestedDefault(type: string): string {
     case "timestamptz":
     case "timestamp": return "now()";
     case "date": return "current_date";
+    case "time":
+    case "timetz": return "current_time";
     case "boolean": return "false";
     case "integer":
     case "bigint":
     case "smallint":
     case "numeric":
+    case "decimal":
     case "real":
+    case "money":
     case "double precision": return "0";
     case "serial":
     case "bigserial": return "";
@@ -372,6 +383,11 @@ export function ColumnEditor({
                           <SelectValue />
                         </SelectTrigger>
                         <SelectContent>
+                          {(!PG_TYPES.includes(col.type) && col.type) && (
+                            <SelectItem key={col.type} value={col.type} className="text-xs">
+                              {col.type}
+                            </SelectItem>
+                          )}
                           {PG_TYPES.map((t) => (
                             <SelectItem key={t} value={t} className="text-xs">
                               {t}
