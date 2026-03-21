@@ -275,7 +275,7 @@ function ERDCanvas({ params }: { params: { projectId: string } }) {
       }
       // Upsert positions and columns for all surviving nodes
       if (nextNodes.length > 0) {
-        await saveNodePositions({ data: { projectId, nodes: nextNodes.map((n) => ({ id: n.id, positionX: n.position.x, positionY: n.position.y })) } });
+        await saveNodePositions({ data: { projectId, nodes: nextNodes.map((n) => { const d = n.data as TableNodeData; return { id: n.id, name: d.name, color: d.color, positionX: n.position.x, positionY: n.position.y }; }) } });
         for (const node of nextNodes) {
           const d = node.data as TableNodeData;
           try { await updateTable({ data: { id: node.id, projectId, name: d.name, color: d.color } }); } catch { /* ignore */ }
@@ -907,7 +907,7 @@ function ERDCanvas({ params }: { params: { projectId: string } }) {
         id,
         ...connection,
         type: "relationship",
-        data: { type: "one-to-many", projectId },
+        data: { type: "one-to-many", projectId, sourceColumnId: sourcePK.id, targetColumnId: targetFK.id },
       };
       setEdges((eds) => addEdge(newEdge, eds));
 
@@ -980,7 +980,8 @@ function ERDCanvas({ params }: { params: { projectId: string } }) {
       const sourceNode = nodes.find((n) => n.id === edge.source);
       const targetNode = nodes.find((n) => n.id === edge.target);
 
-      let fkColumnName: string | null = null;
+      const edgeData = edge.data as any;
+      let fkColumnId: string | null = null;
       let fkTableId: string | null = null;
       let originalColumns: any[] = [];
 
@@ -990,22 +991,22 @@ function ERDCanvas({ params }: { params: { projectId: string } }) {
 
         if (edgeType === "many-to-many") {
           // No FK columns in either table (junction table is export-only)
-          fkColumnName = null;
+          fkColumnId = null;
         } else if (edgeType === "many-to-one") {
-          // FK is in SOURCE table, named after TARGET
-          fkColumnName = `${targetTableData.name}_id`;
+          // FK is in SOURCE table
+          fkColumnId = edgeData?.sourceColumnId ?? null;
           fkTableId = edge.source;
           originalColumns = sourceTableData.columns || [];
         } else {
-          // one-to-one, one-to-many: FK is in TARGET table, named after SOURCE
-          fkColumnName = `${sourceTableData.name}_id`;
+          // one-to-one, one-to-many: FK is in TARGET table
+          fkColumnId = edgeData?.targetColumnId ?? null;
           fkTableId = edge.target;
           originalColumns = targetTableData.columns || [];
         }
 
-        if (fkColumnName && fkTableId) {
+        if (fkColumnId && fkTableId) {
           const updatedColumns = originalColumns.filter(
-            (col) => col.name !== fkColumnName,
+            (col) => col.id !== fkColumnId,
           );
           setNodes((nds) =>
             nds.map((n) =>
@@ -1026,11 +1027,11 @@ function ERDCanvas({ params }: { params: { projectId: string } }) {
 
       // Save to database with error handling
       try {
-        if (sourceNode && targetNode && fkColumnName && fkTableId) {
+        if (sourceNode && targetNode && fkColumnId && fkTableId) {
           const fkNode = fkTableId === edge.source ? sourceNode : targetNode;
           const fkTableData = fkNode.data as TableNodeData;
           const updatedColumns = (fkTableData.columns || []).filter(
-            (col) => col.name !== fkColumnName,
+            (col) => col.id !== fkColumnId,
           );
 
           await saveColumns({
@@ -1307,6 +1308,22 @@ function ERDCanvas({ params }: { params: { projectId: string } }) {
                 targetColumnId: newTargetColumnId,
               },
             });
+
+            // Update local edge data with resolved column IDs
+            setEdges((eds) =>
+              eds.map((e) =>
+                e.id === edgeId
+                  ? {
+                      ...e,
+                      data: {
+                        ...e.data,
+                        sourceColumnId: newSourceColumnId,
+                        targetColumnId: newTargetColumnId,
+                      },
+                    }
+                  : e,
+              ),
+            );
 
             // STEP 3: Now safe to remove old FK column
             if (oldFKSide === "source" && newFKSide !== "source") {
